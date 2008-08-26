@@ -28,6 +28,8 @@ The maximum date is still limited by your tm struct.  Most 32 bit systems use a 
 
 Because of the way gmtime() accounts for leap years, as the time gets larger the performance gets slower.  This can be optimized.
 
+These functions currently don't check for overflow, they have no failure mode.
+
 
 Portability
 -----------
