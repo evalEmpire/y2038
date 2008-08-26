@@ -94,7 +94,7 @@ static const int dow_year_start[28] = {
 };
 
 
-#define LEAP_CHECK(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
+#define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
 #define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
 
 int _is_exception_century(int year)
@@ -147,7 +147,7 @@ int _safe_year(int year)
 
     /* Change non-leap xx00 years to an equivalent */
     if( _is_exception_century(year) )
-        year_cycle += 5;
+        year_cycle += 11;
     
     year_cycle %= SOLAR_CYCLE_LENGTH;
     
@@ -189,11 +189,11 @@ struct tm *gmtime64_r (const long long *in_time, struct tm *p)
     m = (long) v_tm_tday;
     if (m >= 0) {
         p->tm_year = 70;
-        leap = LEAP_CHECK (p->tm_year);
+        leap = IS_LEAP (p->tm_year);
         while (m >= (long) length_of_year[leap]) {
             m -= (long) length_of_year[leap];
             p->tm_year++;
-            leap = LEAP_CHECK (p->tm_year);
+            leap = IS_LEAP (p->tm_year);
         }
         v_tm_mon = 0;
         while (m >= (long) days_in_month[leap][v_tm_mon]) {
@@ -202,11 +202,11 @@ struct tm *gmtime64_r (const long long *in_time, struct tm *p)
         }
     } else {
         p->tm_year = 69;
-        leap = LEAP_CHECK (p->tm_year);
+        leap = IS_LEAP (p->tm_year);
         while (m < (long) -length_of_year[leap]) {
             m += (long) length_of_year[leap];
             p->tm_year--;
-            leap = LEAP_CHECK (p->tm_year);
+            leap = IS_LEAP (p->tm_year);
         }
         v_tm_mon = 11;
         while (m < (long) -days_in_month[leap][v_tm_mon]) {
@@ -245,11 +245,13 @@ struct tm *localtime64_r (const long long *time, struct tm *local_tm)
     local_tm->tm_year = orig_year;
     month_diff = local_tm->tm_mon - gm_tm.tm_mon;
     
-    if( month_diff == 11 )
+    if( month_diff == 11 ) {
         local_tm->tm_year--;
+    }
 
-    if( month_diff == -11 )
+    if( month_diff == -11 ) {
         local_tm->tm_year++;
+    }
 
     _check_tm(local_tm);
     
