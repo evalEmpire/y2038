@@ -39,15 +39,16 @@
 
 */
 
+const char pivotal_gmtime_r_stamp[] =
+    "pivotal_gmtime_r. Copyright (C) 2005  Paul Sheer. Terms and "
+    "conditions apply. Visit http://2038bug.com/ for more info.";
+
 /*
 
 Programmers who have available to them 64-bit time values as a 'long
-long' type can use gmtime64_r() instead, which correctly converts the
-time even on 32-bit systems. Whether you have 64-bit time values
-will depend on the operating system.
-
-Both functions are 64-bit clean and should work as expected on 64-bit
-systems. They have not yet been tested on 64-bit systems however.
+long' type can use localtime64_r() and gmtime64_r() which correctly
+converts the time even on 32-bit systems. Whether you have 64-bit time 
+values will depend on the operating system.
 
 localtime64_r() is a 64-bit equivalent of localtime_r().
 
@@ -253,6 +254,12 @@ struct tm *localtime64_r (const long long *time, struct tm *local_tm)
         local_tm->tm_year++;
     }
 
+    /* GMT is Jan 1st, xx01 year, but localtime is still Dec 31st 
+       in a non-leap xx00.  There is one point in the cycle
+       we can't account for which the safe xx00 year is a leap
+       year.  So we need to correct for Dec 31st comming out as
+       the 366th day of the year.
+    */
     if( !IS_LEAP(local_tm->tm_year) && local_tm->tm_yday == 365 )
         local_tm->tm_yday--;
 
