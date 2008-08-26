@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <time.h>
-#include "gmtime64.h"
+#include "localtime64.h"
 
 int main(int argc, char *argv[])
 {

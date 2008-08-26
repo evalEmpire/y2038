@@ -2,7 +2,7 @@
 
 all : localtime_test
 
-localtime_test : test.c gmtime64.h
+localtime_test : test.c localtime64.h
 	gcc -g -Wall test.c -o localtime_test
 
 test : localtime_test
