@@ -1,12 +1,11 @@
-/* This is a modification of code produced Paul Sheer from 2038bug.com.
-   His copyright, conditions and disclaimer are reproduced below.
+/* localtime64.h is Copyright (C) 2007  Michael G Schwern
+
+   It is a modification on and improvement of code written by 
+   Paul Sheer from 2038bug.com.  His copyright, conditions and 
+   disclaimer are reproduced below.
 */
 
-/* pivotal_gmtime_r - a replacement for gmtime/localtime/mktime
-                      that works around the 2038 bug on 32-bit
-                      systems. (Version 3)
-
-   Copyright (C) 2005  Paul Sheer
+/* Copyright (C) 2005  Paul Sheer
 
    Redistribution and use in source form, with or without modification,
    is permitted provided that the above copyright notice, this list of
@@ -98,7 +97,7 @@ static const int dow_year_start[28] = {
 #define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
 #define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
 
-int _is_exception_century(int year)
+int _is_exception_century(long long year)
 {
     int is_exception = ((year % 100 == 0) && !(year % 400 == 0));
     /* printf("is_exception_century: %s\n", is_exception ? "yes" : "no"); */
@@ -133,11 +132,11 @@ void _check_tm(struct tm *tm)
 /* The exceptional centuries without leap years cause the cycle to
    shift by 16
 */
-int _cycle_offset(int year)
+int _cycle_offset(long long year)
 {
-    int start_year = 2000;
-    int year_diff  = year - start_year - 1;
-    int exceptions  = year_diff / 100;
+    const long long start_year = 2000;
+    long long year_diff  = year - start_year - 1;
+    long long exceptions  = year_diff / 100;
     exceptions     -= year_diff / 400;
 
     assert( year >= 2001 );
@@ -151,10 +150,10 @@ int _cycle_offset(int year)
    year in the 28 year calendar cycle.
 */
 #define SOLAR_CYCLE_LENGTH 28
-int _safe_year(int year)
+int _safe_year(long long year)
 {
     int safe_year;
-    int year_cycle = year + _cycle_offset(year);
+    long long year_cycle = year + _cycle_offset(year);
 
     /* Change non-leap xx00 years to an equivalent */
     if( _is_exception_century(year) )
@@ -241,7 +240,7 @@ struct tm *localtime64_r (const long long *time, struct tm *local_tm)
 {
     time_t safe_time;
     struct tm gm_tm;
-    int orig_year;
+    long long orig_year;
     int month_diff;
 
     gmtime64_r(time, &gm_tm);
