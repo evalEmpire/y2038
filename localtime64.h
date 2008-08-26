@@ -118,6 +118,16 @@ void _check_tm(struct tm *tm)
     assert(tm->tm_yday >= 0 && tm->tm_yday <= 365);
     assert(   tm->tm_gmtoff >= -24 * 60 * 60
            && tm->tm_gmtoff <=  24 * 60 * 60);
+
+    if( !IS_LEAP(tm->tm_year) ) {
+        /* no more than 365 days in a non_leap year */
+        assert( tm->tm_yday <= 364 );
+
+        /* and no more than 28 days in Feb */
+        if( tm->tm_mon == 1 ) {
+            assert( tm->tm_mday <= 28 );
+        }
+    }
 }
 
 /* The exceptional centuries without leap years cause the cycle to
@@ -245,11 +255,17 @@ struct tm *localtime64_r (const long long *time, struct tm *local_tm)
 
     local_tm->tm_year = orig_year;
     month_diff = local_tm->tm_mon - gm_tm.tm_mon;
-    
+
+    /*  When localtime is Dec 31st previous year and
+        gmtime is Jan 1st next year.
+    */
     if( month_diff == 11 ) {
         local_tm->tm_year--;
     }
 
+    /*  When localtime is Jan 1st, next year and
+        gmtime is Dec 31st, previous year.
+    */
     if( month_diff == -11 ) {
         local_tm->tm_year++;
     }
