@@ -99,7 +99,10 @@ static const int dow_year_start[28] = {
 
 int _is_exception_century(int year)
 {
-    return (year % 100) && !(year % 400);
+    int is_exception = ((year % 100 == 0) && !(year % 400 == 0));
+    /* printf("is_exception_century: %s\n", is_exception ? "yes" : "no"); */
+
+    return(is_exception);
 }
 
 void _check_tm(struct tm *tm)
@@ -117,7 +120,8 @@ void _check_tm(struct tm *tm)
 }
 
 /* The exceptional centuries without leap years cause the cycle to
-   shift by 16 */
+   shift by 16
+*/
 int _cycle_offset(int year)
 {
     int start_year = 2000;
@@ -139,13 +143,19 @@ int _cycle_offset(int year)
 int _safe_year(int year)
 {
     int safe_year;
-    int year_cycle = (year + _cycle_offset(year)) % SOLAR_CYCLE_LENGTH;
+    int year_cycle = year + _cycle_offset(year);
+
+    /* Change non-leap xx00 years to an equivalent */
+    if( _is_exception_century(year) )
+        year_cycle += 5;
+    
+    year_cycle %= SOLAR_CYCLE_LENGTH;
     
     safe_year = safe_years[year_cycle];
 
     assert(safe_year <= 2037 && safe_year >= 2010);
     
-    /* 
+    /*
     printf("year: %d, year_cycle: %d, safe_year: %d\n",
            year, year_cycle, safe_year);
     */
