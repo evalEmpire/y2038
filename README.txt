@@ -24,7 +24,9 @@ Future versions will probe for a 64 bit safe system localtime_r() and gmtime_r()
 
 I'm not sure what will happen for negative times.
 
-The maximum date is still limited by your tm struct.  Most 32 bit systems use a signed integer tm_year which means the practical upper limit is the year 2147483647.  In actuality things seem to go wrong around the year 4 million and I'm not sure why.
+The maximum date is still limited by your tm struct.  Most 32 bit systems use a signed integer tm_year which means the practical upper limit is the year 2147483647 which is somewhere around 2**54.
+
+Because of the way gmtime() accounts for leap years, as the time gets larger the performance gets slower.  This can be optimized.
 
 
 Portability
