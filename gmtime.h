@@ -253,6 +253,9 @@ struct tm *localtime64_r (const long long *time, struct tm *local_tm)
         local_tm->tm_year++;
     }
 
+    if( !IS_LEAP(local_tm->tm_year) && local_tm->tm_yday == 365 )
+        local_tm->tm_yday--;
+
     _check_tm(local_tm);
     
     return local_tm;
