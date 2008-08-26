@@ -72,9 +72,35 @@ static const int julian_days_by_month[2][12] = {
 
 static const int length_of_year[2] = { 365, 366 };
 
+/* 28 year calendar cycle between 2010 and 2037 */
+static const int safe_years[28] = {
+    2016, 2017, 2018, 2019,
+    2020, 2021, 2022, 2023,
+    2024, 2025, 2026, 2027,
+    2028, 2029, 2030, 2031,
+    2032, 2033, 2034, 2035,
+    2036, 2037, 2010, 2011,
+    2012, 2013, 2014, 2015
+};
+
+static const int dow_year_start[28] = {
+    5, 0, 1, 2,     /* 2016 - 2019 */
+    3, 5, 6, 0,
+    1, 3, 4, 5,
+    6, 1, 2, 3,
+    4, 6, 0, 1,
+    2, 4, 5, 6,     /* 2036, 2037, 2010, 2011 */
+    0, 2, 3, 4      /* 2012, 2013, 2014, 2015 */
+};
+
+
 #define LEAP_CHECK(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
 #define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
 
+int _is_exception_century(int year)
+{
+    return (year % 100) && !(year % 400);
+}
 
 void _check_tm(struct tm *tm)
 {
@@ -90,37 +116,39 @@ void _check_tm(struct tm *tm)
            && tm->tm_gmtoff <=  24 * 60 * 60);
 }
 
+/* The exceptional centuries without leap years cause the cycle to
+   shift by 16 */
 int _cycle_offset(int year)
 {
     int start_year = 2000;
-    int year_diff  = year - start_year;
-    int cycle_offset = 0;
-    cycle_offset += year_diff / 100;
-    cycle_offset -= year_diff / 400;
-    
-    return cycle_offset;
+    int year_diff  = year - start_year - 1;
+    int exceptions  = year_diff / 100;
+    exceptions     -= year_diff / 400;
+
+    assert( year >= 2001 );
+
+    /* printf("year: %d, exceptions: %d\n", year, exceptions); */
+
+    return exceptions * 16;
 }
 
 /* For a given year after 2038, pick the latest possible matching
    year in the 28 year calendar cycle.
-   XXX Correct for 100/400 year boundries
 */
 #define SOLAR_CYCLE_LENGTH 28
 int _safe_year(int year)
 {
-    int safe_year = 2016;
-    int year_cycle;
+    int safe_year;
+    int year_cycle = (year + _cycle_offset(year)) % SOLAR_CYCLE_LENGTH;
     
-    year_cycle = (year + _cycle_offset(year)) % SOLAR_CYCLE_LENGTH;
-    
-    if( year_cycle <= 21 )
-        safe_year += year_cycle;
-    else
-        safe_year =  safe_year - (SOLAR_CYCLE_LENGTH - year_cycle);
+    safe_year = safe_years[year_cycle];
 
-    assert(safe_year <= 2037 && safe_year >= 2009);
+    assert(safe_year <= 2037 && safe_year >= 2010);
     
-    /* printf("year: %d, safe_year: %d\n", year, safe_year); */
+    /* 
+    printf("year: %d, year_cycle: %d, safe_year: %d\n",
+           year, year_cycle, safe_year);
+    */
 
     return safe_year;
 }
