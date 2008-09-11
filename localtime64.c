@@ -238,7 +238,7 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
         p->tm_year = 69;
 
         /* Gregorian cycles */
-        while (m < (Time64_T) days_in_gregorian_cycle) {
+        while (m < (Time64_T) -days_in_gregorian_cycle) {
             m += (Time64_T) days_in_gregorian_cycle;
             p->tm_year -= years_in_gregorian_cycle;
         }
