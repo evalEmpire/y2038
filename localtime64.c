@@ -83,6 +83,8 @@ static const int dow_year_start[28] = {
     0, 2, 3, 4      /* 2012, 2013, 2014, 2015 */
 };
 
+/* my_timegm() still has bugs */
+#define TIMEGM(n) timegm(n);
 
 #define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
 #define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
@@ -276,7 +278,7 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
     if (gm_tm.tm_year > (2037 - 1900))
         gm_tm.tm_year = _safe_year(gm_tm.tm_year + 1900) - 1900;
 
-    safe_time = timegm(&gm_tm);
+    safe_time = TIMEGM(&gm_tm);
     localtime_r(&safe_time, local_tm);
 
     local_tm->tm_year = orig_year;
@@ -311,6 +313,7 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
 }
 
 
+/* timegm() is a GNU extension, so emulate it here if we need it */
 time_t my_timegm(struct tm *date) {
     time_t gmt;
     time_t lmt;
@@ -338,9 +341,14 @@ time_t my_timegm(struct tm *date) {
         }
     }
 
+    time_diff *= 60 * 60;
+    time_diff -= date->tm_min + gmdate.tm_min * 60;
+
+    /*
     fprintf(stderr, "# time_diff: %d\n", time_diff);
     fprintf(stderr, "# lmt: %d\n", lmt);
+    */
 
-    gmt = lmt + time_diff * 60 * 60;
+    gmt = lmt + time_diff;
     return(gmt);
 }
