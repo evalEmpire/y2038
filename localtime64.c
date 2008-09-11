@@ -84,7 +84,11 @@ static const int dow_year_start[28] = {
 };
 
 /* my_timegm() still has bugs */
-#define TIMEGM(n) timegm(n);
+#ifdef HAS_TIMEGM
+#    define TIMEGM(n) timegm(n);
+#else
+#    define TIMEGM(n) my_timegm(n);
+#endif
 
 #define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
 #define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
@@ -315,40 +319,34 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
 
 /* timegm() is a GNU extension, so emulate it here if we need it */
 time_t my_timegm(struct tm *date) {
-    time_t gmt;
-    time_t lmt;
+    int days    = 0;
+    int seconds = 0;
+    time_t time;
+    int year;
 
-    struct tm gmdate;
-    int time_diff = 0;
-
-    lmt = mktime(date);
-    gmtime_r(&lmt, &gmdate);
-
-    time_diff -= gmdate.tm_hour - date->tm_hour;
-
-    if( date->tm_year > gmdate.tm_year ) {
-        time_diff += 24;
-    }
-    else if( date->tm_year < gmdate.tm_year ) {
-        time_diff -= 24;
-    }
-    else {
-        if( date->tm_mday > gmdate.tm_mday ) {
-            time_diff += 24;
-        }
-        else if( date->tm_mday < gmdate.tm_mday ) {
-            time_diff -= 24;
+    if( date->tm_year > 70 ) {
+        year = 70;
+        while( year < date->tm_year ) {
+            days += length_of_year[IS_LEAP(year)];
+            year++;
         }
     }
+    else if ( date->tm_year < 70 ) {
+        year = 69;
+        do {
+            days -= length_of_year[IS_LEAP(year)];
+            year--;
+        } while( year >= date->tm_year );
+    }
 
-    time_diff *= 60 * 60;
-    time_diff -= date->tm_min + gmdate.tm_min * 60;
+    days += julian_days_by_month[IS_LEAP(date->tm_year)][date->tm_mon];
+    days += date->tm_mday - 1;
 
-    /*
-    fprintf(stderr, "# time_diff: %d\n", time_diff);
-    fprintf(stderr, "# lmt: %d\n", lmt);
-    */
+    seconds += date->tm_hour * 60 * 60;
+    seconds += date->tm_min * 60;
+    seconds += date->tm_sec;
 
-    gmt = lmt + time_diff;
-    return(gmt);
+    time = (time_t)(days * 60 * 60 * 24) + seconds;
+
+    return(time);
 }

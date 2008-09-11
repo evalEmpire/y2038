@@ -7,7 +7,7 @@ localtime64.h contains two public functions, localtime64_r() and gmtime64_r().  
 struct tm *gmtime64_r    (const long long *in_time, struct tm *gm_tm)
 struct tm *localtime64_r (const long long *in_time, struct tm *local_tm)
 
-To install, simply copy localtime64.h into your project and make use of the functions.
+To install, simply copy localtime64.c and localtime64.h into your project and make use of the functions.
 
 To test, run "make test".  It will check the results against tables of known good 64 bit results between 2008 and 2700, in several time zones.  If anything goes wrong it will display the differences
 
