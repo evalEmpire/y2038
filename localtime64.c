@@ -46,6 +46,9 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 #include <errno.h>
 #include "localtime64.h"
 
+#ifndef LOCALTIME64_C
+#    define LOCALTIME64_C
+
 static const int days_in_month[2][12] = {
     {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
     {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
@@ -83,12 +86,6 @@ static const int dow_year_start[28] = {
     0, 2, 3, 4      /* 2012, 2013, 2014, 2015 */
 };
 
-/* my_timegm() still has bugs */
-#ifdef HAS_TIMEGM
-#    define TIMEGM(n) timegm(n);
-#else
-#    define TIMEGM(n) my_timegm(n);
-#endif
 
 #define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
 #define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
@@ -100,6 +97,48 @@ int _is_exception_century(long year)
 
     return(is_exception);
 }
+
+
+/* timegm() is a GNU extension, so emulate it here if we need it */
+#ifdef HAS_TIMEGM
+#    define TIMEGM(n) timegm(n);
+#else
+#    define TIMEGM(n) _my_timegm(n);
+#endif
+
+time_t _my_timegm(struct tm *date) {
+    int days    = 0;
+    int seconds = 0;
+    time_t time;
+    int year;
+
+    if( date->tm_year > 70 ) {
+        year = 70;
+        while( year < date->tm_year ) {
+            days += length_of_year[IS_LEAP(year)];
+            year++;
+        }
+    }
+    else if ( date->tm_year < 70 ) {
+        year = 69;
+        do {
+            days -= length_of_year[IS_LEAP(year)];
+            year--;
+        } while( year >= date->tm_year );
+    }
+
+    days += julian_days_by_month[IS_LEAP(date->tm_year)][date->tm_mon];
+    days += date->tm_mday - 1;
+
+    seconds += date->tm_hour * 60 * 60;
+    seconds += date->tm_min * 60;
+    seconds += date->tm_sec;
+
+    time = (time_t)(days * 60 * 60 * 24) + seconds;
+
+    return(time);
+}
+
 
 void _check_tm(struct tm *tm)
 {
@@ -316,37 +355,4 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
     return local_tm;
 }
 
-
-/* timegm() is a GNU extension, so emulate it here if we need it */
-time_t my_timegm(struct tm *date) {
-    int days    = 0;
-    int seconds = 0;
-    time_t time;
-    int year;
-
-    if( date->tm_year > 70 ) {
-        year = 70;
-        while( year < date->tm_year ) {
-            days += length_of_year[IS_LEAP(year)];
-            year++;
-        }
-    }
-    else if ( date->tm_year < 70 ) {
-        year = 69;
-        do {
-            days -= length_of_year[IS_LEAP(year)];
-            year--;
-        } while( year >= date->tm_year );
-    }
-
-    days += julian_days_by_month[IS_LEAP(date->tm_year)][date->tm_mon];
-    days += date->tm_mday - 1;
-
-    seconds += date->tm_hour * 60 * 60;
-    seconds += date->tm_min * 60;
-    seconds += date->tm_sec;
-
-    time = (time_t)(days * 60 * 60 * 24) + seconds;
-
-    return(time);
-}
+#endif /* LOCALTIME64_C */
