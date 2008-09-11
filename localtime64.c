@@ -73,6 +73,10 @@ static const int julian_days_by_month[2][12] = {
 
 static const int length_of_year[2] = { 365, 366 };
 
+/* Number of days in a 400 year Gregorian cycle */
+static const int years_in_gregorian_cycle = 400;
+static const int days_in_gregorian_cycle  = (365 * 400) + 100 - 4 + 1;
+
 /* 28 year calendar cycle between 2010 and 2037 */
 static const int safe_years[28] = {
     2016, 2017, 2018, 2019,
@@ -209,12 +213,22 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     m = v_tm_tday;
     if (m >= 0) {
         p->tm_year = 70;
+
+        /* Gregorian cycles, this is huge optimization for distant times */
+        while (m >= (Time64_T) days_in_gregorian_cycle) {
+            m -= (Time64_T) days_in_gregorian_cycle;
+            p->tm_year += years_in_gregorian_cycle;
+        }
+
+        /* Years */
         leap = IS_LEAP (p->tm_year);
         while (m >= (Time64_T) length_of_year[leap]) {
             m -= (Time64_T) length_of_year[leap];
             p->tm_year++;
             leap = IS_LEAP (p->tm_year);
         }
+
+        /* Months */
         v_tm_mon = 0;
         while (m >= (Time64_T) days_in_month[leap][v_tm_mon]) {
             m -= (Time64_T) days_in_month[leap][v_tm_mon];
@@ -222,12 +236,22 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
         }
     } else {
         p->tm_year = 69;
+
+        /* Gregorian cycles */
+        while (m < (Time64_T) days_in_gregorian_cycle) {
+            m += (Time64_T) days_in_gregorian_cycle;
+            p->tm_year -= years_in_gregorian_cycle;
+        }
+
+        /* Years */
         leap = IS_LEAP (p->tm_year);
         while (m < (Time64_T) -length_of_year[leap]) {
             m += (Time64_T) length_of_year[leap];
             p->tm_year--;
             leap = IS_LEAP (p->tm_year);
         }
+
+        /* Months */
         v_tm_mon = 11;
         while (m < (Time64_T) -days_in_month[leap][v_tm_mon]) {
             m += (Time64_T) days_in_month[leap][v_tm_mon];
