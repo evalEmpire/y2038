@@ -1,4 +1,4 @@
-/* localtime64.h is Copyright (C) 2007  Michael G Schwern
+/* localtime64.h is Copyright (C) 2007-2008  Michael G Schwern
 
    It is a modification on and improvement of code written by 
    Paul Sheer from 2038bug.com.  His copyright, conditions and 
@@ -116,8 +116,11 @@ void _check_tm(struct tm *tm)
     assert(tm->tm_mon  >= 0 && tm->tm_mon  <= 11);
     assert(tm->tm_wday >= 0 && tm->tm_wday <= 6);
     assert(tm->tm_yday >= 0 && tm->tm_yday <= 365);
+
+#ifdef TM_HAS_GMTOFF
     assert(   tm->tm_gmtoff >= -24 * 60 * 60
            && tm->tm_gmtoff <=  24 * 60 * 60);
+#endif
 
     if( !IS_LEAP(tm->tm_year) ) {
         /* no more than 365 days in a non_leap year */
@@ -181,11 +184,16 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     int leap;
     Time64_T m;
     Time64_T time = *in_time;
-    
+
+#ifdef TM_HAS_GMTOFF
     p->tm_gmtoff = 0;
+#endif
     p->tm_isdst  = 0;
+
+#ifdef TM_HAS_ZONE
     p->tm_zone   = "UTC";
-    
+#endif
+
     v_tm_sec =  time % 60;
     time /= 60;
     v_tm_min =  time % 60;
