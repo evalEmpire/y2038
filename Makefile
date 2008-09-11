@@ -14,11 +14,14 @@ localtime64.o : localtime64.h localtime64.c
 t/localtime_test : t/localtime_test.c localtime64.o
 	$(LINK) localtime64.o t/localtime_test.c -o $@
 
-t/year_limit_test.t : t/year_limit_test.c localtime64.o
+t/year_limit_test.t : tap.c t/year_limit_test.c localtime64.o
 	$(LINK) localtime64.o t/year_limit_test.c -o $@
 
-t/negative_test.t : t/negative_test.c localtime64.o
+t/negative_test.t : tap.c t/negative_test.c localtime64.o
 	$(LINK) localtime64.o t/negative_test.c -o $@
+
+t/overflow.t : tap.c t/overflow.c localtime64.o
+	$(LINK) localtime64.o t/overflow.c -o $@
 
 test : localtime_test tap_tests
 
@@ -28,7 +31,7 @@ localtime_test: t/localtime_test
 	TZ=Australia/West t/localtime_test | bzip -9 > t/oz_test.out.bz2
 	bzdiff -u t/oz_test.out.bz2 t/oztime.out.bz2 | less -F
 
-tap_tests: t/year_limit_test.t t/negative_test.t
+tap_tests: t/year_limit_test.t t/negative_test.t t/overflow.t
 	@prove --exec '' t/*.t
 
 clean:

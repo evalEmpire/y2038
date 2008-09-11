@@ -1,4 +1,12 @@
+#include <stdlib.h>
+#include <stdio.h>
+
 int Test_Count = 0;
+
+void skip_all(const char *reason) {
+    printf("1..0 # Skip %s\n", reason);
+    exit(0);
+}
 
 int ok(const int test, const char *name) {
     printf("%s %s\n", (test ? "ok" : "not ok"), name);

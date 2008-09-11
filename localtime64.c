@@ -59,6 +59,7 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <errno.h>
 #include "localtime64.h"
 
 static const int days_in_month[2][12] = {
@@ -188,6 +189,7 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     int leap;
     Time64_T m;
     Time64_T time = *in_time;
+    Time64_T year;
 
 #ifdef TM_HAS_GMTOFF
     p->tm_gmtoff = 0;
@@ -212,20 +214,20 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
         v_tm_wday += 7;
     m = v_tm_tday;
     if (m >= 0) {
-        p->tm_year = 70;
+        year = 70;
 
         /* Gregorian cycles, this is huge optimization for distant times */
         while (m >= (Time64_T) days_in_gregorian_cycle) {
             m -= (Time64_T) days_in_gregorian_cycle;
-            p->tm_year += years_in_gregorian_cycle;
+            year += years_in_gregorian_cycle;
         }
 
         /* Years */
-        leap = IS_LEAP (p->tm_year);
+        leap = IS_LEAP (year);
         while (m >= (Time64_T) length_of_year[leap]) {
             m -= (Time64_T) length_of_year[leap];
-            p->tm_year++;
-            leap = IS_LEAP (p->tm_year);
+            year++;
+            leap = IS_LEAP (year);
         }
 
         /* Months */
@@ -235,20 +237,20 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
             v_tm_mon++;
         }
     } else {
-        p->tm_year = 69;
+        year = 69;
 
         /* Gregorian cycles */
         while (m < (Time64_T) -days_in_gregorian_cycle) {
             m += (Time64_T) days_in_gregorian_cycle;
-            p->tm_year -= years_in_gregorian_cycle;
+            year -= years_in_gregorian_cycle;
         }
 
         /* Years */
-        leap = IS_LEAP (p->tm_year);
+        leap = IS_LEAP (year);
         while (m < (Time64_T) -length_of_year[leap]) {
             m += (Time64_T) length_of_year[leap];
-            p->tm_year--;
-            leap = IS_LEAP (p->tm_year);
+            year--;
+            leap = IS_LEAP (year);
         }
 
         /* Months */
@@ -259,6 +261,13 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
         }
         m += (Time64_T) days_in_month[leap][v_tm_mon];
     }
+
+    p->tm_year = year;
+    if( p->tm_year != year ) {
+        errno = EOVERFLOW;
+        return NULL;
+    }
+
     p->tm_mday = (int) m + 1;
     p->tm_yday = julian_days_by_month[leap][v_tm_mon] + m;
     p->tm_sec = v_tm_sec, p->tm_min = v_tm_min, p->tm_hour = v_tm_hour,
