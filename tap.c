@@ -9,13 +9,13 @@ void skip_all(const char *reason) {
 }
 
 int ok(const int test, const char *name) {
-    printf("%s %s\n", (test ? "ok" : "not ok"), name);
+    Test_Count++;
+
+    printf("%s %d %s\n", (test ? "ok" : "not ok"), Test_Count, name);
 
     if( !test ) {
         fprintf(stderr, "Failed test '%s'.\n", name);
     }
-
-    Test_Count++;
 
     return test;
 }
@@ -29,6 +29,11 @@ int is_int(const int have, const int want, const char *name) {
     }
 
     return test;
+}
+
+int diag(const char *message) {
+    fprintf(stderr, "# %s\n", message);
+    return(0);
 }
 
 void done_testing(void) {

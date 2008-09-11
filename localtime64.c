@@ -309,3 +309,38 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
     
     return local_tm;
 }
+
+
+time_t my_timegm(struct tm *date) {
+    time_t gmt;
+    time_t lmt;
+
+    struct tm gmdate;
+    int time_diff = 0;
+
+    lmt = mktime(date);
+    gmtime_r(&lmt, &gmdate);
+
+    time_diff -= gmdate.tm_hour - date->tm_hour;
+
+    if( date->tm_year > gmdate.tm_year ) {
+        time_diff += 24;
+    }
+    else if( date->tm_year < gmdate.tm_year ) {
+        time_diff -= 24;
+    }
+    else {
+        if( date->tm_mday > gmdate.tm_mday ) {
+            time_diff += 24;
+        }
+        else if( date->tm_mday < gmdate.tm_mday ) {
+            time_diff -= 24;
+        }
+    }
+
+    fprintf(stderr, "# time_diff: %d\n", time_diff);
+    fprintf(stderr, "# lmt: %d\n", lmt);
+
+    gmt = lmt + time_diff * 60 * 60;
+    return(gmt);
+}

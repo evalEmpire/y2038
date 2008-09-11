@@ -5,7 +5,9 @@
 
 typedef long long Time64_T;
 
-struct tm *gmtime64_r    (const Time64_T *in_time, struct tm *p);
-struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm);
+struct tm *gmtime64_r    (const Time64_T *, struct tm *);
+struct tm *localtime64_r (const Time64_T *, struct tm *);
+
+time_t my_timegm     (struct tm *);
 
 #endif
