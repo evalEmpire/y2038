@@ -12,8 +12,8 @@ int main(void) {
 
     error = gmtime64_r(&time, &date);
 
-    is_int( (int)error, (int)NULL,      "gmtime64_r() returned null on overflow" );
-    is_int( errno, EOVERFLOW,           "  errno set to EOVERFLOW" );
+    ok( error == NULL,          "gmtime64_r() returned null on overflow" );
+    is_int( errno, EOVERFLOW,   "  errno set to EOVERFLOW" );
 
     done_testing();
     return 0;
