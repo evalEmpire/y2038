@@ -86,6 +86,13 @@ static const int dow_year_start[28] = {
     0, 2, 3, 4      /* 2012, 2013, 2014, 2015 */
 };
 
+/* Let's assume people are going to be looking for dates in the future.
+   Let's provide some cheats so you can skip ahead.
+   This has a 4x speed boost when near 2008.
+*/
+/* Number of days since epoch on Jan 1st, 2008 GMT */
+#define CHEAT_DAYS  (1199145600 / 24 / 60 / 60)
+#define CHEAT_YEARS 108
 
 #define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
 #define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
@@ -218,7 +225,7 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     int leap;
     Time64_T m;
     Time64_T time = *in_time;
-    Time64_T year;
+    Time64_T year = 70;
 
 #ifdef TM_HAS_GMTOFF
     p->tm_gmtoff = 0;
@@ -242,9 +249,13 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     if ((v_tm_wday = (v_tm_tday + 4) % 7) < 0)
         v_tm_wday += 7;
     m = v_tm_tday;
-    if (m >= 0) {
-        year = 70;
 
+    if (m >= CHEAT_DAYS) {
+        year = CHEAT_YEARS;
+        m -= CHEAT_DAYS;
+    }
+
+    if (m >= 0) {
         /* Gregorian cycles, this is huge optimization for distant times */
         while (m >= (Time64_T) days_in_gregorian_cycle) {
             m -= (Time64_T) days_in_gregorian_cycle;
@@ -266,7 +277,7 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
             v_tm_mon++;
         }
     } else {
-        year = 69;
+        year--;
 
         /* Gregorian cycles */
         while (m < (Time64_T) -days_in_gregorian_cycle) {

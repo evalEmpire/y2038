@@ -11,6 +11,12 @@ all : t/localtime_test
 
 localtime64.o : localtime64.h localtime64.c
 
+t/bench : t/bench.c localtime64.o
+	$(LINK) localtime64.o t/bench.c -o $@
+
+bench : t/bench
+	time t/bench
+
 t/localtime_test : t/localtime_test.c localtime64.o
 	$(LINK) localtime64.o t/localtime_test.c -o $@
 
