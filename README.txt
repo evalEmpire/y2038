@@ -48,9 +48,6 @@ for now all I can do is document the assumptions...
 Not all systems have localtime_r() or gmtime_r().  This code is easily
 adaptable to use the non-reentrant versions.
 
-timegm() is a non-standard function.  Future versions will ship with its
-own copy.
-
 This code assumes that long longs are 64 bit integers which is technically
 in violation of the C standard.  This can be changed in localtime64.h by
-changing the Time64_T typedef.
+changing the Time64_T and Int64 typedefs.
