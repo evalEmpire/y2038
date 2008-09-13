@@ -2,14 +2,14 @@
 
 OPTIMIZE = -g
 CC       = gcc
-CCFLAGS  = -Wall
+CFLAGS   = -Wall
 INCLUDE  = -I.
 COMPILE  = $(CC) $(OPTIMIZE) $(INCLUDE) $(CCFLAGS)
 LINK     = $(COMPILE)
 
 all : t/localtime_test
 
-localtime64.o : localtime64.h localtime64.c
+localtime64.o : localtime64.h localtime64.c Makefile
 
 t/bench : t/bench.c localtime64.o
 	$(LINK) localtime64.o t/bench.c -o $@
