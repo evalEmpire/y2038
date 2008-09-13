@@ -4,7 +4,7 @@ OPTIMIZE = -g
 CC       = gcc
 CFLAGS   = -Wall
 INCLUDE  = -I.
-COMPILE  = $(CC) $(OPTIMIZE) $(INCLUDE) $(CCFLAGS)
+COMPILE  = $(CC) $(OPTIMIZE) $(INCLUDE) $(CFLAGS)
 LINK     = $(COMPILE)
 
 all : t/localtime_test
