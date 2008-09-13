@@ -46,9 +46,6 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 #include <errno.h>
 #include "localtime64.h"
 
-#ifndef LOCALTIME64_C
-#    define LOCALTIME64_C
-
 static const int days_in_month[2][12] = {
     {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
     {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
@@ -97,7 +94,7 @@ static const int dow_year_start[28] = {
 #define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
 #define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
 
-int _is_exception_century(long year)
+int _is_exception_century(Int64 year)
 {
     int is_exception = ((year % 100 == 0) && !(year % 400 == 0));
     /* printf("is_exception_century: %s\n", is_exception ? "yes" : "no"); */
@@ -149,39 +146,44 @@ time_t _my_timegm(struct tm *date) {
 
 void _check_tm(struct tm *tm)
 {
+    int is_leap = IS_LEAP(tm->tm_year);
+
     /* Don't forget leap seconds */
-    assert(tm->tm_sec  >= 0 && tm->tm_sec <= 61);
-    assert(tm->tm_min  >= 0 && tm->tm_min <= 59);
-    assert(tm->tm_hour >= 0 && tm->tm_hour <= 23);
-    assert(tm->tm_mday >= 1 && tm->tm_mday <= 31);
-    assert(tm->tm_mon  >= 0 && tm->tm_mon  <= 11);
-    assert(tm->tm_wday >= 0 && tm->tm_wday <= 6);
-    assert(tm->tm_yday >= 0 && tm->tm_yday <= 365);
+    assert(tm->tm_sec  >= 0);
+    assert(tm->tm_sec <= 61);
 
-#ifdef TM_HAS_GMTOFF
-    assert(   tm->tm_gmtoff >= -24 * 60 * 60
-           && tm->tm_gmtoff <=  24 * 60 * 60);
+    assert(tm->tm_min  >= 0);
+    assert(tm->tm_min <= 59);
+
+    assert(tm->tm_hour >= 0);
+    assert(tm->tm_hour <= 23);
+
+    assert(tm->tm_mday >= 1);
+    assert(tm->tm_mday <= days_in_month[is_leap][tm->tm_mon]);
+
+    assert(tm->tm_mon  >= 0);
+    assert(tm->tm_mon  <= 11);
+
+    assert(tm->tm_wday >= 0);
+    assert(tm->tm_wday <= 6);
+    
+    assert(tm->tm_yday >= 0);
+    assert(tm->tm_yday <= length_of_year[is_leap]);
+
+#ifdef HAS_TM_TM_GMTOFF
+    assert(tm->tm_gmtoff >= -24 * 60 * 60);
+    assert(tm->tm_gmtoff <=  24 * 60 * 60);
 #endif
-
-    if( !IS_LEAP(tm->tm_year) ) {
-        /* no more than 365 days in a non_leap year */
-        assert( tm->tm_yday <= 364 );
-
-        /* and no more than 28 days in Feb */
-        if( tm->tm_mon == 1 ) {
-            assert( tm->tm_mday <= 28 );
-        }
-    }
 }
 
 /* The exceptional centuries without leap years cause the cycle to
    shift by 16
 */
-int _cycle_offset(long year)
+int _cycle_offset(Int64 year)
 {
-    const long start_year = 2000;
-    long year_diff  = year - start_year - 1;
-    long exceptions  = year_diff / 100;
+    const Int64 start_year = 2000;
+    Int64 year_diff  = year - start_year - 1;
+    Int64 exceptions  = year_diff / 100;
     exceptions     -= year_diff / 400;
 
     assert( year >= 2001 );
@@ -195,10 +197,10 @@ int _cycle_offset(long year)
    year in the 28 year calendar cycle.
 */
 #define SOLAR_CYCLE_LENGTH 28
-int _safe_year(long year)
+int _safe_year(Int64 year)
 {
     int safe_year;
-    long year_cycle = year + _cycle_offset(year);
+    Int64 year_cycle = year + _cycle_offset(year);
 
     /* Change non-leap xx00 years to an equivalent */
     if( _is_exception_century(year) )
@@ -221,18 +223,18 @@ int _safe_year(long year)
 struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
 {
     int v_tm_sec, v_tm_min, v_tm_hour, v_tm_mon, v_tm_wday;
-    Time64_T v_tm_tday;
+    Int64 v_tm_tday;
     int leap;
-    Time64_T m;
+    Int64 m;
     Time64_T time = *in_time;
-    Time64_T year = 70;
+    Int64 year = 70;
 
-#ifdef TM_HAS_GMTOFF
+#ifdef HAS_TM_TM_GMTOFF
     p->tm_gmtoff = 0;
 #endif
     p->tm_isdst  = 0;
 
-#ifdef TM_HAS_ZONE
+#ifdef HAS_TM_TM_ZONE
     p->tm_zone   = "UTC";
 #endif
 
@@ -304,7 +306,9 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
 
     p->tm_year = year;
     if( p->tm_year != year ) {
+#ifdef EOVERFLOW
         errno = EOVERFLOW;
+#endif
         return NULL;
     }
 
@@ -323,7 +327,7 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
 {
     time_t safe_time;
     struct tm gm_tm;
-    long orig_year;
+    Int64 orig_year;
     int month_diff;
 
     gmtime64_r(time, &gm_tm);
@@ -365,5 +369,3 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
     
     return local_tm;
 }
-
-#endif /* LOCALTIME64_C */

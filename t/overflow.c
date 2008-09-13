@@ -7,8 +7,11 @@ int main(void) {
     struct tm date;
     struct tm *error;
 
+#ifndef EOVERFLOW
+    skip_all( "EOVERFLOW not defined on this system" );
+#else
     if( sizeof(date.tm_year) > 4 )
-        skip_all( "tm_year is too large to overflow" );
+        skip_all( "tm_year is too large to overflow (yay!)" );
 
     error = gmtime64_r(&time, &date);
 
@@ -16,6 +19,8 @@ int main(void) {
     is_int( errno, EOVERFLOW,   "  errno set to EOVERFLOW" );
 
     done_testing();
+#endif
+
     return 0;
 }
  
