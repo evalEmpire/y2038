@@ -55,8 +55,7 @@ clean:
 		t/overflow.t		\
 	   	t/localtime_test	\
 		t/gmtime_test		\
-		t/eastern_test.out.bz2	\
-		t/oz_test.out.bz2	\
-		t/gmtime_test.out.bz2	\
-		localtime64.o
+		t/*_test.out.bz2	\
+		t/bench			\
+		*.o
 
