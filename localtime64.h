@@ -27,9 +27,9 @@
    Should we use the system functions if the time is inside their range?
 */
 #define SYSTEM_LOCALTIME_MAX    2147483647
-#define SYSTEM_LOCALTIME_MIN    -2147483648
+#define SYSTEM_LOCALTIME_MIN    -2147483647
 #define SYSTEM_GMTIME_MAX       2147483647
-#define SYSTEM_GMTIME_MIN       -2147483648
+#define SYSTEM_GMTIME_MIN       -2147483647
 
 /* It'll be faster */
 #define USE_SYSTEM_LOCALTIME    1
