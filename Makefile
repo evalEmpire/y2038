@@ -35,6 +35,9 @@ t/overflow.t : tap.c t/overflow.c localtime64.o
 t/my_timegm.t : tap.c t/my_timegm.c localtime64.o
 	$(LINK) localtime64.o t/my_timegm.c -o $@
 
+t/safe_year.t : tap.c t/safe_year.c localtime64.c
+	$(LINK) t/safe_year.c -o $@
+
 test : localtime_tests tap_tests
 
 localtime_tests: t/localtime_test t/gmtime_test
@@ -45,7 +48,7 @@ localtime_tests: t/localtime_test t/gmtime_test
 	TZ=Australia/West t/localtime_test | bzip -9 > t/oz_test.out.bz2
 	bzdiff -u t/oz_test.out.bz2 t/oztime.out.bz2 | less -F
 
-tap_tests: t/year_limit_test.t t/negative_test.t t/overflow.t t/my_timegm.t
+tap_tests: t/year_limit_test.t t/negative_test.t t/overflow.t t/my_timegm.t t/safe_year.t
 	@prove --exec '' t/*.t
 
 clean:
@@ -53,6 +56,7 @@ clean:
 		t/negative_test.t	\
 		t/my_timegm.t		\
 		t/overflow.t		\
+		t/safe_year.t		\
 	   	t/localtime_test	\
 		t/gmtime_test		\
 		t/*_test.out.bz2	\

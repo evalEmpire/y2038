@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 #include <time.h>
+#include "localtime64.h"
 
 int Test_Count = 0;
 
@@ -25,13 +27,22 @@ void skip_all(const char *reason) {
     exit(0);
 }
 
-int ok(const int test, const char *name) {
+int ok(const int test, const char *message, ...) {
+    va_list args;
+
     Test_Count++;
 
-    printf("%s %d %s\n", (test ? "ok" : "not ok"), Test_Count, name);
+    va_start(args, message);
+
+    printf("%s %d ", (test ? "ok" : "not ok"), Test_Count);
+    vprintf(message, args);
+    printf("\n");
+
+    va_end(args);
 
     if( !test ) {
-        diag("Failed test '%s'.", name);
+        diag("Failed test");
+        diag(message, args);
     }
 
     return test;
@@ -44,6 +55,18 @@ int is_int(const int have, const int want, const char *name) {
     if( !test ) {
         diag("have: %d", have);
         diag("want: %d", want);
+    }
+
+    return test;
+}
+
+int is_Int64(const Int64 have, const Int64 want, const char *name) {
+    int test = (have == want);
+    ok( test, name );
+
+    if( !test ) {
+        diag("have: %lld", have);
+        diag("want: %lld", want);
     }
 
     return test;
