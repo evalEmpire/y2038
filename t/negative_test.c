@@ -4,20 +4,31 @@
 
 int main(void) {
     struct tm date;
-    Time64_T time = -10;
+    Time64_T time;
 
-    gmtime64_r(&time, &date);
-    is_int(date.tm_year, 69, "gmtime64_r(-10)");
+    time = -10;
+    is_not_null( gmtime64_r(&time, &date), "gmtime / Wed Dec 31 23:59:50 1969" );
+    tm_ok(&date,
+          1969 - 1900, 11, 31,
+          23, 59, 50);
 
-    /* -2140698894-01-13 14:56:01 */
     time = -0x00EFFFFFFFFFFFFFLL;
-    gmtime64_r(&time, &date);
-    is_int(date.tm_year + 1900, -2140698894, "  -2**54 year");
-    is_int(date.tm_mon  + 1,    1,           "    month");
-    is_int(date.tm_mday,        13,          "    day");
-    is_int(date.tm_hour,        14,          "    hour");
-    is_int(date.tm_min,         56,          "    min");
-    is_int(date.tm_sec,         1,           "    sec");
+    is_not_null( gmtime64_r(&time, &date), "gmtime / -2140698894-01-13 14:56:01" );
+    tm_ok(&date,
+          -2140698894 - 1900, 0, 13,
+          14, 56, 01);
+
+    time = -4298423296LL;
+    is_not_null( gmtime64_r(&time, &date), "Tue Oct 15 17:31:44 1833" );
+    tm_ok(&date,
+          1833 - 1900, 9, 15,
+          17, 31, 44);
+
+    /* It is safe to assume that the year and month
+       will be the same, even with a julian/gregorian shift */
+    is_not_null( localtime64_r(&time, &date), "localtime" );
+    is_int(date.tm_year,        1833 - 1900,    "localtm.year");
+    is_int(date.tm_mon,         9,              "       .mon");
 
     done_testing();
     return 0;
