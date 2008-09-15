@@ -1,10 +1,10 @@
 .PHONY : test
 
 OPTIMIZE = -g
-CC       = gcc
-CFLAGS   = -Wall
 INCLUDE  = -I.
-COMPILE  = $(CC) $(OPTIMIZE) $(INCLUDE) $(CFLAGS)
+CC       = gcc
+CFLAGS   = -Wall $(OPTIMIZE) $(INCLUDE)
+COMPILE  = $(CC) $(CFLAGS)
 LINK     = $(COMPILE)
 
 all : t/localtime_test
