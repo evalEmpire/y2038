@@ -1,3 +1,7 @@
+/* Test the internal _safe_year() function which does the critical mapping
+   to make the localtime trick work
+*/
+
 #include "tap.c"
 #include "localtime64.c"
 
@@ -37,20 +41,31 @@ void test_safe_year(Int64 orig_year) {
     _year_to_nyd(orig_year, &orig_tm);
     is_int( safe_tm.tm_wday, orig_tm.tm_wday,                           "  previous tm_wday" );
     is_int( IS_LEAP( safe_year - 1900 ), IS_LEAP( orig_year - 1900 ),   "  previous ISLEAP()" );
+
+    safe_year += 2;
+    orig_year += 2;
+    _year_to_nyd((Int64)safe_year, &safe_tm);
+    _year_to_nyd(orig_year, &orig_tm);
+    is_int( safe_tm.tm_wday, orig_tm.tm_wday,                           "  next tm_wday" );
+    /* Don't care about the next leap status */
 }
 
 int main(void) {
-    test_safe_year(2000);
-    test_safe_year(2038);
-    test_safe_year(2100);
-    test_safe_year(2200);
-    test_safe_year(2400);
-    test_safe_year(2401);
-    test_safe_year(1969);
-    test_safe_year(1900);
+    int year;
+
+    /* Boundry tests */
     test_safe_year(1);
     test_safe_year(0);
     test_safe_year(-1);
+    
+
+    for( year = 1599;  year <= 2401;  year++ ) {
+        test_safe_year(year);
+    }
+
+    for( year = -401;  year <= 401;  year++ ) {
+        test_safe_year(year);
+    }
 
     done_testing();
 

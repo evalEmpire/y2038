@@ -48,14 +48,19 @@ int ok(const int test, const char *message, ...) {
     return test;
 }
 
-int is_int(const int have, const int want, const char *name) {
+int is_int(const int have, const int want, const char *message, ...) {
     int test = (have == want);
-    ok( test, name );
+    va_list args;
+    va_start(args, message);
+
+    ok( test, message, args );
 
     if( !test ) {
         diag("have: %d", have);
         diag("want: %d", want);
     }
+
+    va_end(args);
 
     return test;
 }
