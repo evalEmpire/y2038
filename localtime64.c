@@ -198,12 +198,13 @@ int _cycle_offset(Int64 year)
 {
     const Int64 start_year = 2000;
     Int64 year_diff  = year - start_year;
+    Int64 exceptions;
 
     if( year > start_year )
         year_diff--;
 
-    Int64 exceptions  = year_diff / 100;
-    exceptions       -= year_diff / 400;
+    exceptions  = year_diff / 100;
+    exceptions -= year_diff / 400;
 
     /*
     fprintf(stderr, "# year: %lld, exceptions: %lld, year_diff: %lld\n",
@@ -273,7 +274,7 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     /* Use the system gmtime() if time_t is small enough */
     if( SHOULD_USE_SYSTEM_GMTIME(*in_time) ) {
         time_t safe_time = *in_time;
-        localtime_r(&safe_time, p);
+        gmtime_r(&safe_time, p);
         assert(_check_tm(p));
         return p;
     }
