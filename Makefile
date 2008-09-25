@@ -3,7 +3,7 @@
 OPTIMIZE = -g
 INCLUDE  = -I.
 CC       = gcc
-CFLAGS   = -Wall $(OPTIMIZE) $(INCLUDE)
+CFLAGS   = -Wall -ansi -pedantic -Wno-long-long $(OPTIMIZE) $(INCLUDE)
 COMPILE  = $(CC) $(CFLAGS)
 LINK     = $(COMPILE)
 
@@ -38,7 +38,7 @@ t/timegm.t : tap.c t/timegm.c localtime64.o
 t/safe_year.t : tap.c t/safe_year.c localtime64.c
 	$(LINK) t/safe_year.c -o $@
 
-test : localtime_tests tap_tests
+test : tap_tests localtime_tests
 
 localtime_tests: t/localtime_test t/gmtime_test
 	@which bzdiff > /dev/null || (echo "You need bzdiff to run these tests"; exit 1)

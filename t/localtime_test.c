@@ -5,8 +5,10 @@
 int main(int argc, char *argv[])
 {
     struct tm d;
-    d.tm_year = 90;
     long long time = 1202380093;
+
+    d.tm_year = 90;
+
     while(d.tm_year < 800) {
         localtime64_r(&time, &d);
         printf("%lld %d %d %d %d %d %d %d %d %d\n",

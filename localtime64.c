@@ -194,11 +194,11 @@ int _check_tm(struct tm *tm)
 /* The exceptional centuries without leap years cause the cycle to
    shift by 16
 */
-int _cycle_offset(Int64 year)
+Year _cycle_offset(Year year)
 {
-    const Int64 start_year = 2000;
-    Int64 year_diff  = year - start_year;
-    Int64 exceptions;
+    const Year start_year = 2000;
+    Year year_diff  = year - start_year;
+    Year exceptions;
 
     if( year > start_year )
         year_diff--;
@@ -231,10 +231,10 @@ int _cycle_offset(Int64 year)
    It doesn't need the same leap year status since we only care about
    January 1st.
 */
-int _safe_year(Int64 year)
+int _safe_year(Year year)
 {
     int safe_year;
-    Int64 year_cycle = year + _cycle_offset(year);
+    Year year_cycle = year + _cycle_offset(year);
 
     /* Change non-leap xx00 years to an equivalent */
     if( _is_exception_century(year) )
@@ -269,7 +269,7 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     int leap;
     Int64 m;
     Time64_T time = *in_time;
-    Int64 year = 70;
+    Year year = 70;
 
     /* Use the system gmtime() if time_t is small enough */
     if( SHOULD_USE_SYSTEM_GMTIME(*in_time) ) {
@@ -288,17 +288,20 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     p->tm_zone   = "UTC";
 #endif
 
-    v_tm_sec =  time % 60;
+    v_tm_sec =  (int)(time % 60);
     time /= 60;
-    v_tm_min =  time % 60;
+    v_tm_min =  (int)(time % 60);
     time /= 60;
-    v_tm_hour = time % 24;
+    v_tm_hour = (int)(time % 24);
     time /= 24;
     v_tm_tday = time;
+
     WRAP (v_tm_sec, v_tm_min, 60);
     WRAP (v_tm_min, v_tm_hour, 60);
     WRAP (v_tm_hour, v_tm_tday, 24);
-    if ((v_tm_wday = (v_tm_tday + 4) % 7) < 0)
+
+    v_tm_wday = (int)((v_tm_tday + 4) % 7);
+    if (v_tm_wday < 0)
         v_tm_wday += 7;
     m = v_tm_tday;
 
@@ -377,7 +380,7 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
 {
     time_t safe_time;
     struct tm gm_tm;
-    Int64 orig_year;
+    Year orig_year;
     int month_diff;
 
     /* Use the system localtime() if time_t is small enough */

@@ -41,6 +41,7 @@
 /* 64 bit types.  Set as appropriate for your system. */
 typedef long long               Time64_T;
 typedef long long               Int64;
+typedef Int64                   Year;
 
 struct tm *gmtime64_r    (const Time64_T *, struct tm *);
 struct tm *localtime64_r (const Time64_T *, struct tm *);
