@@ -42,6 +42,7 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 #include <errno.h>
 #include "localtime64.h"
@@ -262,6 +263,27 @@ int _safe_year(Year year)
     return safe_year;
 }
 
+
+/* Simulate localtime_r() to the best of our ability */
+struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
+    struct tm *static_result = localtime(clock);
+
+    memcpy(result, static_result, sizeof(*result));
+
+    return static_result == NULL ? NULL : result;
+}
+
+
+/* Simulate gmtime_r() to the best of our ability */
+struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
+    struct tm *static_result = gmtime(clock);
+
+    memcpy(result, static_result, sizeof(*result));
+
+    return static_result == NULL ? NULL : result;
+}
+
+
 struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
 {
     int v_tm_sec, v_tm_min, v_tm_hour, v_tm_mon, v_tm_wday;
@@ -274,7 +296,7 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     /* Use the system gmtime() if time_t is small enough */
     if( SHOULD_USE_SYSTEM_GMTIME(*in_time) ) {
         time_t safe_time = *in_time;
-        gmtime_r(&safe_time, p);
+        GMTIME_R(&safe_time, p);
         assert(_check_tm(p));
         return p;
     }
@@ -366,7 +388,7 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     }
 
     p->tm_mday = (int) m + 1;
-    p->tm_yday = julian_days_by_month[leap][v_tm_mon] + m;
+    p->tm_yday = (int) julian_days_by_month[leap][v_tm_mon] + m;
     p->tm_sec = v_tm_sec, p->tm_min = v_tm_min, p->tm_hour = v_tm_hour,
         p->tm_mon = v_tm_mon, p->tm_wday = v_tm_wday;
     
@@ -386,7 +408,7 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
     /* Use the system localtime() if time_t is small enough */
     if( SHOULD_USE_SYSTEM_LOCALTIME(*time) ) {
         safe_time = *time;
-        localtime_r(&safe_time, local_tm);
+        LOCALTIME_R(&safe_time, local_tm);
         assert(_check_tm(local_tm));
         return local_tm;
     }
@@ -404,7 +426,7 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
     }
 
     safe_time = TIMEGM(&gm_tm);
-    if( localtime_r(&safe_time, local_tm) == NULL )
+    if( LOCALTIME_R(&safe_time, local_tm) == NULL )
         return NULL;
 
     local_tm->tm_year = orig_year;
