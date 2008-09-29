@@ -2,8 +2,8 @@
    to make the localtime trick work
 */
 
-#include "tap.c"
-#include "localtime64.c"
+#include "t/tap.c"
+#include "time64.c"
 
 
 void _year_to_TM(const Int64 year, struct TM *date) {

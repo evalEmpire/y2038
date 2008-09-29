@@ -1,23 +1,24 @@
-This is an implementation of localtime_r() and gmtime_r() which solves the
-year 2038 bug on systems where time_t is only 32 bits.	The latest version
-can be found at http://y2038.googlecode.com/
+This is an implementation of POSIX time.h which solves the year 2038
+bug on systems where time_t is only 32 bits.  It is implemented in
+bog-standard ANSI C.  The latest version can be found at
+http://y2038.googlecode.com/
 
-It makes use of the system's native 32 bit localtime_r() to perform time
-zone and daylight savings time calculations and thus does *not* ship it's
-own time zone table.
+It makes use of the system's native 32 bit functions to perform time
+zone and daylight savings time calculations and thus does *not* need
+to ship its own time zone table.
 
-localtime64.h contains two public functions, localtime64_r() and
-gmtime64_r().  They are implementations of localtime_r() and gmtime_r().
+time64.h currently implements three public functions, localtime64_r(),
+gmtime64_r() and timegm64().  They are implementations of
+localtime_r(), gmtime_r() and timegm64().
 
-struct tm *gmtime64_r	 (const long long *in_time, struct tm *gm_tm)
-struct tm *localtime64_r (const long long *in_time, struct tm *local_tm)
+To install, simply copy time64.c and time64.h into your project and
+make use of the functions.
 
-To install, simply copy localtime64.c and localtime64.h into your project
-and make use of the functions.
-
-To test, run "make test".  It will check the results against tables of
-known good 64 bit results between 2008 and 2700, in several time zones.  If
-anything goes wrong it will display the differences
+To test, run "make test".  You must have Perl, prove (which comes with
+a recent version of the Test::Harness Perl module) and bzdiff
+installed to run the full test suite.  It will do a number of unit
+tests, plus test against a large table of known good values in
+different time zones.
 
 
 Limitations, Issues, etc...
@@ -29,25 +30,23 @@ for localtime_r().  The calculations are accurate according to current time
 zone and daylight savings information, but may become inaccurate if a
 change is made that takes place after 2010.
 
-Future versions will simply use the system gmtime_r() and localtime_r() if
-the given time is within a safe range.
-
 Future versions will probe for a 64 bit safe system localtime_r() and
 gmtime_r() and use that.
 
-The maximum date is still limited by your tm struct.  Most 32 bit systems
-use a signed integer tm_year which means the practical upper limit is the
-year 2147483647 which is somewhere around 2**54.
+The maximum date is still limited by your tm struct.  Most 32 bit
+systems use a signed integer tm_year which means the practical upper
+limit is the year 2147483647 which is somewhere around 2**54.  You can
+use a 64 bit clean tm struct by setting USE_TM64 in time64.h
 
 
 Portability
 -----------
+
 I would like to add some configuration detection stuff in the future, but
 for now all I can do is document the assumptions...
 
-Not all systems have localtime_r() or gmtime_r().  This code is easily
-adaptable to use the non-reentrant versions.
-
 This code assumes that long longs are 64 bit integers which is technically
-in violation of the C standard.  This can be changed in localtime64.h by
+in violation of the C standard.  This can be changed in time64.h by
 changing the Time64_T and Int64 typedefs.
+
+There are a number of configuration options in time64.h.

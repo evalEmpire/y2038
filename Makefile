@@ -8,35 +8,35 @@ CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 COMPILE  = $(CC) $(CFLAGS)
 LINK     = $(COMPILE)
 
-all : localtime64.o
+all : time64.o
 
-localtime64.o : localtime64.h localtime64.c Makefile
+time64.o : time64.h time64.c Makefile
 
-t/bench : t/bench.c localtime64.o
-	$(LINK) localtime64.o t/bench.c -o $@
+t/bench : t/bench.c time64.o
+	$(LINK) time64.o t/bench.c -o $@
 
 bench : t/bench
 	time t/bench
 
-t/localtime_test : t/localtime_test.c localtime64.o
-	$(LINK) localtime64.o t/localtime_test.c -o $@
+t/localtime_test : t/localtime_test.c time64.o
+	$(LINK) time64.o t/localtime_test.c -o $@
 
-t/gmtime_test : t/gmtime_test.c localtime64.o
-	$(LINK) localtime64.o t/gmtime_test.c -o $@
+t/gmtime_test : t/gmtime_test.c time64.o
+	$(LINK) time64.o t/gmtime_test.c -o $@
 
-t/year_limit_test.t : tap.c t/year_limit_test.c localtime64.o
-	$(LINK) localtime64.o t/year_limit_test.c -o $@
+t/year_limit_test.t : t/tap.c t/year_limit_test.c time64.o
+	$(LINK) time64.o t/year_limit_test.c -o $@
 
-t/negative_test.t : tap.c t/negative_test.c localtime64.o
-	$(LINK) localtime64.o t/negative_test.c -o $@
+t/negative_test.t : t/tap.c t/negative_test.c time64.o
+	$(LINK) time64.o t/negative_test.c -o $@
 
-t/overflow.t : tap.c t/overflow.c localtime64.o
-	$(LINK) localtime64.o t/overflow.c -o $@
+t/overflow.t : t/tap.c t/overflow.c time64.o
+	$(LINK) time64.o t/overflow.c -o $@
 
-t/timegm.t : tap.c t/timegm.c localtime64.o
-	$(LINK) localtime64.o t/timegm.c -o $@
+t/timegm.t : t/tap.c t/timegm.c time64.o
+	$(LINK) time64.o t/timegm.c -o $@
 
-t/safe_year.t : tap.c t/safe_year.c localtime64.c
+t/safe_year.t : t/tap.c t/safe_year.c time64.c
 	$(LINK) t/safe_year.c -o $@
 
 test : tap_tests localtime_tests

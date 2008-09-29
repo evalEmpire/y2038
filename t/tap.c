@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
-#include "localtime64.h"
+#include "time64.h"
 
 int Test_Count = 0;
 
