@@ -6,7 +6,7 @@
 #include "time64.c"
 
 
-void year_to_TM(const Int64 year, struct TM *date) {
+static void year_to_TM(const Int64 year, struct TM *date) {
     Time64_T time;
 
     date->tm_year = year - 1900;
@@ -21,7 +21,7 @@ void year_to_TM(const Int64 year, struct TM *date) {
 }
 
 
-void year_to_tm(const Int64 year, struct tm *ret) {
+static void year_to_tm(const Int64 year, struct tm *ret) {
     Time64_T time;
     struct TM date;
 
@@ -38,7 +38,7 @@ void year_to_tm(const Int64 year, struct tm *ret) {
 }
 
 
-void test_safe_year(Int64 orig_year) {
+static void test_safe_year(Int64 orig_year) {
     int year = safe_year( orig_year );
     struct tm safe_tm;
     struct TM orig_tm;

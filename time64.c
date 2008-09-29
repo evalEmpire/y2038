@@ -108,7 +108,7 @@ static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
 )
 
 
-int is_exception_century(Int64 year)
+static int is_exception_century(Int64 year)
 {
     int is_exception = ((year % 100 == 0) && !(year % 400 == 0));
     /* printf("is_exception_century: %s\n", is_exception ? "yes" : "no"); */
@@ -159,7 +159,7 @@ Time64_T timegm64(struct TM *date) {
 }
 
 
-int check_tm(struct TM *tm)
+static int check_tm(struct TM *tm)
 {
     /* Don't forget leap seconds */
     assert(tm->tm_sec >= 0);
@@ -195,7 +195,7 @@ int check_tm(struct TM *tm)
 /* The exceptional centuries without leap years cause the cycle to
    shift by 16
 */
-Year cycle_offset(Year year)
+static Year cycle_offset(Year year)
 {
     const Year start_year = 2000;
     Year year_diff  = year - start_year;
@@ -232,7 +232,7 @@ Year cycle_offset(Year year)
    It doesn't need the same leap year status since we only care about
    January 1st.
 */
-int safe_year(Year year)
+static int safe_year(Year year)
 {
     int safe_year;
     Year year_cycle = year + cycle_offset(year);
@@ -264,7 +264,7 @@ int safe_year(Year year)
 }
 
 
-void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
+static void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -296,7 +296,7 @@ void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
 }
 
 
-void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
+static void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -329,7 +329,7 @@ void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
 
 
 /* Simulate localtime_r() to the best of our ability */
-struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
+static struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
     const struct tm *static_result = localtime(clock);
 
     assert(result != NULL);
@@ -346,7 +346,7 @@ struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
 
 
 /* Simulate gmtime_r() to the best of our ability */
-struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
+static struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
     const struct tm *static_result = gmtime(clock);
 
     assert(result != NULL);
