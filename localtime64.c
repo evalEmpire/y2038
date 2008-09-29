@@ -266,21 +266,35 @@ int _safe_year(Year year)
 
 /* Simulate localtime_r() to the best of our ability */
 struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
-    struct tm *static_result = localtime(clock);
+    const struct tm *static_result = localtime(clock);
 
-    memcpy(result, static_result, sizeof(*result));
+    assert(result != NULL);
 
-    return static_result == NULL ? NULL : result;
+    if( static_result == NULL ) {
+        memset(result, 0, sizeof(*result));
+        return NULL;
+    }
+    else {
+        memcpy(result, static_result, sizeof(*result));
+        return result;
+    }
 }
 
 
 /* Simulate gmtime_r() to the best of our ability */
 struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
-    struct tm *static_result = gmtime(clock);
+    const struct tm *static_result = gmtime(clock);
 
-    memcpy(result, static_result, sizeof(*result));
+    assert(result != NULL);
 
-    return static_result == NULL ? NULL : result;
+    if( static_result == NULL ) {
+        memset(result, 0, sizeof(*result));
+        return NULL;
+    }
+    else {
+        memcpy(result, static_result, sizeof(*result));
+        return result;
+    }
 }
 
 
@@ -292,6 +306,8 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     Int64 m;
     Time64_T time = *in_time;
     Year year = 70;
+
+    assert(p != NULL);
 
     /* Use the system gmtime() if time_t is small enough */
     if( SHOULD_USE_SYSTEM_GMTIME(*in_time) ) {
@@ -404,6 +420,8 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
     struct tm gm_tm;
     Year orig_year;
     int month_diff;
+
+    assert(local_tm != NULL);
 
     /* Use the system localtime() if time_t is small enough */
     if( SHOULD_USE_SYSTEM_LOCALTIME(*time) ) {
