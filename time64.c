@@ -108,7 +108,7 @@ static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
 )
 
 
-int _is_exception_century(Int64 year)
+int is_exception_century(Int64 year)
 {
     int is_exception = ((year % 100 == 0) && !(year % 400 == 0));
     /* printf("is_exception_century: %s\n", is_exception ? "yes" : "no"); */
@@ -159,7 +159,7 @@ Time64_T timegm64(struct TM *date) {
 }
 
 
-int _check_tm(struct TM *tm)
+int check_tm(struct TM *tm)
 {
     /* Don't forget leap seconds */
     assert(tm->tm_sec >= 0);
@@ -195,7 +195,7 @@ int _check_tm(struct TM *tm)
 /* The exceptional centuries without leap years cause the cycle to
    shift by 16
 */
-Year _cycle_offset(Year year)
+Year cycle_offset(Year year)
 {
     const Year start_year = 2000;
     Year year_diff  = year - start_year;
@@ -232,17 +232,17 @@ Year _cycle_offset(Year year)
    It doesn't need the same leap year status since we only care about
    January 1st.
 */
-int _safe_year(Year year)
+int safe_year(Year year)
 {
     int safe_year;
-    Year year_cycle = year + _cycle_offset(year);
+    Year year_cycle = year + cycle_offset(year);
 
     /* Change non-leap xx00 years to an equivalent */
-    if( _is_exception_century(year) )
+    if( is_exception_century(year) )
         year_cycle += 11;
 
     /* Also xx01 years, since the previous year will be wrong */
-    if( _is_exception_century(year - 1) )
+    if( is_exception_century(year - 1) )
         year_cycle += 17;
 
     year_cycle %= SOLAR_CYCLE_LENGTH;
@@ -380,7 +380,7 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
         GMTIME_R(&safe_time, &safe_date);
 
         copy_tm_to_TM(&safe_date, p);
-        assert(_check_tm(p));
+        assert(check_tm(p));
 
         return p;
     }
@@ -476,7 +476,7 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
     p->tm_sec = v_tm_sec, p->tm_min = v_tm_min, p->tm_hour = v_tm_hour,
         p->tm_mon = v_tm_mon, p->tm_wday = v_tm_wday;
     
-    assert(_check_tm(p));
+    assert(check_tm(p));
 
     return p;
 }
@@ -499,7 +499,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
         LOCALTIME_R(&safe_time, &safe_date);
 
         copy_tm_to_TM(&safe_date, local_tm);
-        assert(_check_tm(local_tm));
+        assert(check_tm(local_tm));
 
         return local_tm;
     }
@@ -513,7 +513,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
         gm_tm.tm_year < (1902 - 1900)
        )
     {
-        gm_tm.tm_year = _safe_year(gm_tm.tm_year + 1900) - 1900;
+        gm_tm.tm_year = safe_year(gm_tm.tm_year + 1900) - 1900;
     }
 
     safe_time = TIMEGM(&gm_tm);
@@ -556,7 +556,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
     if( !IS_LEAP(local_tm->tm_year) && local_tm->tm_yday == 365 )
         local_tm->tm_yday--;
 
-    assert(_check_tm(local_tm));
+    assert(check_tm(local_tm));
     
     return local_tm;
 }
