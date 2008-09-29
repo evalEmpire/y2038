@@ -3,7 +3,7 @@
 #include "tap.c"
 
 int main(void) {
-    struct tm date;
+    struct TM date;
     Time64_T time;
 
     time = -10;

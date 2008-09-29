@@ -81,7 +81,7 @@ int is_not_null(void *arg, const char *name) {
     return( ok( arg != NULL, name ) );
 }
 
-int tm_ok(const struct tm *have,
+int tm_ok(const struct TM *have,
           const int year, const int mon, const int mday,
           const int hour, const int min, const int sec)
 {

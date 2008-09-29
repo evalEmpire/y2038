@@ -4,8 +4,8 @@
 
 int main(void) {
     Time64_T time = 0x0FFFFFFFFFFFFFFFLL;
-    struct tm date;
-    struct tm *error;
+    struct TM date;
+    struct TM *error;
 
 #ifndef EOVERFLOW
     skip_all( "EOVERFLOW not defined on this system" );

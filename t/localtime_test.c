@@ -4,7 +4,7 @@
 
 int main(void)
 {
-    struct tm d;
+    struct TM d;
     long long time = 1202380093;
 
     d.tm_year = 90;

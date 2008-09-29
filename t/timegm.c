@@ -3,7 +3,7 @@
 #include "localtime64.h"
 
 int main(void) {
-    struct tm date;
+    struct TM date;
     Time64_T time = 0;
 
     gmtime64_r(&time, &date);

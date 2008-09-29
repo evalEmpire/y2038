@@ -124,7 +124,7 @@ int _is_exception_century(Int64 year)
 #    define TIMEGM(n) ((time_t)timegm64(n));
 #endif
 
-Time64_T timegm64(struct tm *date) {
+Time64_T timegm64(struct TM *date) {
     int   days    = 0;
     Int64 seconds = 0;
     Int64 year;
@@ -159,7 +159,7 @@ Time64_T timegm64(struct tm *date) {
 }
 
 
-int _check_tm(struct tm *tm)
+int _check_tm(struct TM *tm)
 {
     /* Don't forget leap seconds */
     assert(tm->tm_sec >= 0);
@@ -264,6 +264,70 @@ int _safe_year(Year year)
 }
 
 
+void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
+    if( src == NULL ) {
+        memset(dest, 0, sizeof(*dest));
+    }
+    else {
+#       ifdef USE_TM64
+            dest->tm_sec        = src->tm_sec;
+            dest->tm_min        = src->tm_min;
+            dest->tm_hour       = src->tm_hour;
+            dest->tm_mday       = src->tm_mday;
+            dest->tm_mon        = src->tm_mon;
+            dest->tm_year       = (Year)src->tm_year;
+            dest->tm_wday       = src->tm_wday;
+            dest->tm_yday       = src->tm_yday;
+            dest->tm_isdst      = src->tm_isdst;
+
+#           ifdef HAS_TM_TM_GMTOFF
+                dest->tm_gmtoff  = src->tm_gmtoff;
+#           endif
+
+#           ifdef HAS_TM_TM_ZONE
+                dest->tm_tmzone  = src->tm_tmzone;
+#           endif
+
+#       else
+            /* They're the same type */
+            memcpy(dest, src, sizeof(*dest));
+#       endif
+    }
+}
+
+
+void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
+    if( src == NULL ) {
+        memset(dest, 0, sizeof(*dest));
+    }
+    else {
+#       ifdef USE_TM64
+            dest->tm_sec        = src->tm_sec;
+            dest->tm_min        = src->tm_min;
+            dest->tm_hour       = src->tm_hour;
+            dest->tm_mday       = src->tm_mday;
+            dest->tm_mon        = src->tm_mon;
+            dest->tm_year       = (int)src->tm_year;
+            dest->tm_wday       = src->tm_wday;
+            dest->tm_yday       = src->tm_yday;
+            dest->tm_isdst      = src->tm_isdst;
+
+#           ifdef HAS_TM_TM_GMTOFF
+                dest->tm_gmtoff  = src->tm_gmtoff;
+#           endif
+
+#           ifdef HAS_TM_TM_ZONE
+                dest->tm_tmzone  = src->tm_tmzone;
+#           endif
+
+#       else
+            /* They're the same type */
+            memcpy(dest, src, sizeof(*dest));
+#       endif
+    }
+}
+
+
 /* Simulate localtime_r() to the best of our ability */
 struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
     const struct tm *static_result = localtime(clock);
@@ -298,7 +362,7 @@ struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
 }
 
 
-struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
+struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
 {
     int v_tm_sec, v_tm_min, v_tm_hour, v_tm_mon, v_tm_wday;
     Int64 v_tm_tday;
@@ -312,8 +376,12 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
     /* Use the system gmtime() if time_t is small enough */
     if( SHOULD_USE_SYSTEM_GMTIME(*in_time) ) {
         time_t safe_time = *in_time;
-        GMTIME_R(&safe_time, p);
+        struct tm safe_date;
+        GMTIME_R(&safe_time, &safe_date);
+
+        copy_tm_to_TM(&safe_date, p);
         assert(_check_tm(p));
+
         return p;
     }
 
@@ -414,10 +482,11 @@ struct tm *gmtime64_r (const Time64_T *in_time, struct tm *p)
 }
 
 
-struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
+struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
 {
     time_t safe_time;
-    struct tm gm_tm;
+    struct tm safe_date;
+    struct TM gm_tm;
     Year orig_year;
     int month_diff;
 
@@ -426,8 +495,12 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
     /* Use the system localtime() if time_t is small enough */
     if( SHOULD_USE_SYSTEM_LOCALTIME(*time) ) {
         safe_time = *time;
-        LOCALTIME_R(&safe_time, local_tm);
+
+        LOCALTIME_R(&safe_time, &safe_date);
+
+        copy_tm_to_TM(&safe_date, local_tm);
         assert(_check_tm(local_tm));
+
         return local_tm;
     }
 
@@ -444,8 +517,10 @@ struct tm *localtime64_r (const Time64_T *time, struct tm *local_tm)
     }
 
     safe_time = TIMEGM(&gm_tm);
-    if( LOCALTIME_R(&safe_time, local_tm) == NULL )
+    if( LOCALTIME_R(&safe_time, &safe_date) == NULL )
         return NULL;
+
+    copy_tm_to_TM(&safe_date, local_tm);
 
     local_tm->tm_year = orig_year;
     if( local_tm->tm_year != orig_year ) {

@@ -1,7 +1,7 @@
 #include "localtime64.h"
 
 int main(void) {
-    struct tm date;
+    struct TM date;
     Time64_T time = 1221176626;  /* About 23:44 Sep 11, 2008 GMT */
     int i;
 
