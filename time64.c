@@ -264,7 +264,7 @@ static int safe_year(Year year)
 }
 
 
-static void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
+void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -296,7 +296,7 @@ static void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
 }
 
 
-static void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
+void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -329,7 +329,7 @@ static void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
 
 
 /* Simulate localtime_r() to the best of our ability */
-static struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
+struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
     const struct tm *static_result = localtime(clock);
 
     assert(result != NULL);
@@ -346,7 +346,7 @@ static struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
 
 
 /* Simulate gmtime_r() to the best of our ability */
-static struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
+struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
     const struct tm *static_result = gmtime(clock);
 
     assert(result != NULL);

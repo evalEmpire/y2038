@@ -24,20 +24,20 @@ t/localtime_test : t/localtime_test.c time64.o
 t/gmtime_test : t/gmtime_test.c time64.o
 	$(LINK) time64.o t/gmtime_test.c -o $@
 
-t/year_limit_test.t : t/tap.c t/year_limit_test.c time64.o
-	$(LINK) time64.o t/year_limit_test.c -o $@
+t/year_limit.t : t/tap.c t/year_limit.t.c time64.o
+	$(LINK) time64.o t/year_limit.t.c -o $@
 
-t/negative_test.t : t/tap.c t/negative_test.c time64.o
-	$(LINK) time64.o t/negative_test.c -o $@
+t/negative.t : t/tap.c t/negative.t.c time64.o
+	$(LINK) time64.o t/negative.t.c -o $@
 
-t/overflow.t : t/tap.c t/overflow.c time64.o
-	$(LINK) time64.o t/overflow.c -o $@
+t/overflow.t : t/tap.c t/overflow.t.c time64.o
+	$(LINK) time64.o t/overflow.t.c -o $@
 
-t/timegm.t : t/tap.c t/timegm.c time64.o
-	$(LINK) time64.o t/timegm.c -o $@
+t/timegm.t : t/tap.c t/timegm.t.c time64.o
+	$(LINK) time64.o t/timegm.t.c -o $@
 
-t/safe_year.t : t/tap.c t/safe_year.c time64.c
-	$(LINK) t/safe_year.c -o $@
+t/safe_year.t : t/tap.c t/safe_year.t.c time64.c
+	$(LINK) t/safe_year.t.c -o $@
 
 test : tap_tests localtime_tests
 
@@ -51,7 +51,7 @@ localtime_tests: t/localtime_test t/gmtime_test
 	TZ=Australia/West t/localtime_test | bzip -9 > t/oz_test.out.bz2
 	bzdiff -u t/oz_test.out.bz2 t/oztime.out.bz2 | less -F
 
-tap_tests: t/year_limit_test.t t/negative_test.t t/overflow.t t/timegm.t t/safe_year.t
+tap_tests: t/year_limit.t t/negative.t t/overflow.t t/timegm.t t/safe_year.t
 	@perl -MTest::Harness -wle 'if( $$Test::Harness::VERSION < 3.00 ) {	\
 		print "You need the Test::Harness 3 Perl module to run these tests";	\
 	        exit 1 \
@@ -59,8 +59,8 @@ tap_tests: t/year_limit_test.t t/negative_test.t t/overflow.t t/timegm.t t/safe_
 	@prove --exec '' t/*.t
 
 clean:
-	-rm 	t/year_limit_test.t 	\
-		t/negative_test.t	\
+	-rm 	t/year_limit.t 		\
+		t/negative.t		\
 		t/timegm.t		\
 		t/overflow.t		\
 		t/safe_year.t		\
