@@ -8,7 +8,7 @@ CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 COMPILE  = $(CC) $(CFLAGS)
 LINK     = $(COMPILE)
 
-all : t/localtime_test
+all : localtime64.o
 
 localtime64.o : localtime64.h localtime64.c Makefile
 
