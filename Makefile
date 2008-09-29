@@ -3,7 +3,8 @@
 OPTIMIZE = -g
 INCLUDE  = -I.
 CC       = gcc
-CFLAGS   = -Wall -ansi -pedantic -Wno-long-long $(OPTIMIZE) $(INCLUDE)
+WARNINGS = -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels
+CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 COMPILE  = $(CC) $(CFLAGS)
 LINK     = $(COMPILE)
 

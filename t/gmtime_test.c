@@ -2,7 +2,7 @@
 #include <time.h>
 #include "localtime64.h"
 
-int main(int argc, char *argv[])
+int main(void)
 {
     struct tm d;
     long long time = 1202380093;
