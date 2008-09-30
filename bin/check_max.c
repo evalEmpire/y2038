@@ -6,20 +6,17 @@
 
 time_t Time_Zero = 0;
 
-void check_gmtime_max (void)
-{
+void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name ) {
     struct tm *date;
-
-    /* Let's not bother checking anything smaller than 2**30-1 */
-    time_t time = 1073741823;
+    time_t time = 0;
     time_t last_time = 0;
     time_t time_change;
     int i;
 
-    for (i = 30; i <= 63; i++) {
-        date = gmtime(&time);
+    for (i = 0; i <= 63; i++) {
+        date = (*date_func)(&time);
 
-        /* gmtime() broke or tm_year overflowed */
+        /* date_func() broke or tm_year overflowed */
         if(date == NULL || date->tm_year < 69)
           break;
 
@@ -38,9 +35,9 @@ void check_gmtime_max (void)
     do {
         time += time_change;
 
-        date = gmtime(&time);
+        date = (*date_func)(&time);
 
-        /* gmtime() broke or tm_year overflowed or time_t overflowed */
+        /* date_func() broke or tm_year overflowed or time_t overflowed */
         if(date == NULL || date->tm_year < 69 || time < last_time) {
             time = last_time;
             time_change = time_change / 2;
@@ -50,12 +47,11 @@ void check_gmtime_max (void)
         }
     } while(time_change > 0);
 
-    printf("%20s %.0f\n", "gmtime max", difftime(last_time, Time_Zero));
+    printf("%20s max %.0f\n", func_name, difftime(last_time, Time_Zero));
 }
 
 
-void check_gmtime_min (void)
-{
+void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name ) {
     struct tm *date;
     time_t time = -1;
     time_t last_time = 0;
@@ -63,9 +59,9 @@ void check_gmtime_min (void)
     int i;
 
     for (i = 1; i <= 63; i++) {
-        date = gmtime(&time);
+        date = (*date_func)(&time);
 
-        /* gmtime() broke or tm_year underflowed */
+        /* date_func() broke or tm_year underflowed */
         if(date == NULL || date->tm_year > 70)
             break;
 
@@ -84,7 +80,7 @@ void check_gmtime_min (void)
     do {
         time -= time_change;
 
-        date = gmtime(&time);
+        date = (*date_func)(&time);
 
         /* gmtime() broke or tm_year overflowed or time_t overflowed */
         if(date == NULL || date->tm_year < 69 || time < last_time) {
@@ -96,69 +92,15 @@ void check_gmtime_min (void)
         }
     } while(time_change > 0);
 
-    printf("%20s %.0f\n", "gmtime min", difftime(last_time, Time_Zero));
-}
-
-
-void check_localtime_max (void)
-{
-    struct tm *date;
-
-    /* Let's not bother checking anything smaller than 2**30-1 */
-    time_t time = 1073741823;
-    time_t last_time = 0;
-    int i;
-
-    for (i = 30; i <= 63; i++) {
-        date = localtime(&time);
-
-        /* gmtime() broke or tm_year overflowed */
-        if(date == NULL || date->tm_year < 69)
-            break;
-
-        last_time = time;
-        time += time + 1;
-
-        /* time_t overflowed */
-        if( time < last_time )
-            break;
-    }
-
-    printf("%20s %.0f\n", "localtime max", difftime(last_time, Time_Zero));
-}
-
-
-void check_localtime_min (void)
-{
-    struct tm *date;
-    time_t time = -1;
-    time_t last_time = 0;
-    int i;
-
-    for (i = 1; i <= 63; i++) {
-        date = localtime(&time);
-
-        /* gmtime() broke or tm_year underflowed */
-        if(date == NULL || date->tm_year > 70)
-            break;
-
-        last_time = time;
-        time += time;
-
-        /* time_t underflowed */
-        if( time > last_time )
-            break;
-    }
-
-    printf("%20s %.0f\n", "localtime min", difftime(last_time, Time_Zero));
+    printf("%20s min %.0f\n", func_name, difftime(last_time, Time_Zero));
 }
 
 
 int main(void) {
-    check_gmtime_max();
-    check_gmtime_min();
-    check_localtime_max();
-    check_localtime_min();
+    check_date_max(gmtime, "gmtime");
+    check_date_max(localtime, "localtime");
+    check_date_min(gmtime, "gmtime");
+    check_date_min(localtime, "localtime");
 
     return 0;
 }
