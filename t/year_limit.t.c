@@ -11,7 +11,7 @@ int main(void)
     printf("# sizeof time_t: %ld\n", sizeof(time_t));
     printf("# sizeof long long: %ld\n", sizeof(Time64_T));
     printf("# sizeof tm.tm_year: %ld\n", sizeof(gtime.tm_year));
-    printf("# %04lld.%02d.%02d %02d:%02d:%02d %05ld %s\n",
+    printf("# %04d.%02d.%02d %02d:%02d:%02d\n",
         gtime.tm_year + 1900,
         gtime.tm_mon  + 1,
         gtime.tm_mday,
