@@ -45,6 +45,7 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <math.h>
 #include "time64.h"
 
 static const int days_in_month[2][12] = {
@@ -60,7 +61,7 @@ static const int julian_days_by_month[2][12] = {
 static const int length_of_year[2] = { 365, 366 };
 
 /* Number of days in a 400 year Gregorian cycle */
-static const int years_in_gregorian_cycle = 400;
+static const Year years_in_gregorian_cycle = 400;
 static const int days_in_gregorian_cycle  = (365 * 400) + 100 - 4 + 1;
 
 /* 28 year calendar cycle between 2010 and 2037 */
@@ -370,6 +371,7 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
     Int64 m;
     Time64_T time = *in_time;
     Year year = 70;
+    int cycles = 0;
 
     assert(p != NULL);
 
@@ -418,9 +420,10 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
 
     if (m >= 0) {
         /* Gregorian cycles, this is huge optimization for distant times */
-        while (m >= (Time64_T) days_in_gregorian_cycle) {
-            m -= (Time64_T) days_in_gregorian_cycle;
-            year += years_in_gregorian_cycle;
+        cycles = floor(m / (Time64_T) days_in_gregorian_cycle);
+        if( cycles ) {
+            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
+            year += (cycles * years_in_gregorian_cycle);
         }
 
         /* Years */
@@ -441,9 +444,10 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
         year--;
 
         /* Gregorian cycles */
-        while (m < (Time64_T) -days_in_gregorian_cycle) {
-            m += (Time64_T) days_in_gregorian_cycle;
-            year -= years_in_gregorian_cycle;
+        cycles = ceil(m / (Time64_T) days_in_gregorian_cycle) + 1;
+        if( cycles ) {
+            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
+            year += (cycles * years_in_gregorian_cycle);
         }
 
         /* Years */
