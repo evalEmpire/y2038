@@ -1,0 +1,7 @@
+This project is not intended to be installed on your system, but to be
+used as part of an application or project.  Simply copy time64.c and
+time64.h into your project, compile them as part of your build process
+and include them instead of (or in addition to) time.h.
+
+It is written to the POSIX time.h standard and should work with any
+ANSI C 89 compiler.
