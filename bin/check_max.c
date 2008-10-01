@@ -13,8 +13,13 @@ void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name )
     time_t time_change;
     int i;
 
-    /* Find where time_t overflows */
     for (i = 0; i <= 63; i++) {
+        date = (*date_func)(&time);
+
+        /* date_func() broke or tm_year overflowed */
+        if(date == NULL || date->tm_year < 69)
+          break;
+
         last_time = time;
         time += time + 1;
 
@@ -23,9 +28,7 @@ void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name )
             break;
     }
 
-
-    /* Do a binary search between the last good time and the overflow
-       to find the exact spot */
+    /* Binary search for the exact failure point */
     time = last_time;
     time_change = last_time / 2;
 
@@ -56,6 +59,12 @@ void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name )
     int i;
 
     for (i = 1; i <= 63; i++) {
+        date = (*date_func)(&time);
+
+        /* date_func() broke or tm_year underflowed */
+        if(date == NULL || date->tm_year > 70)
+            break;
+
         last_time = time;
         time += time;
 
