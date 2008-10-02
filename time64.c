@@ -65,7 +65,8 @@ static const Year years_in_gregorian_cycle = 400;
 static const int days_in_gregorian_cycle  = (365 * 400) + 100 - 4 + 1;
 
 /* 28 year calendar cycle between 2010 and 2037 */
-static const int safe_years[28] = {
+#define SOLAR_CYCLE_LENGTH 28
+static const int safe_years[SOLAR_CYCLE_LENGTH] = {
     2016, 2017, 2018, 2019,
     2020, 2021, 2022, 2023,
     2024, 2025, 2026, 2027,
@@ -75,7 +76,6 @@ static const int safe_years[28] = {
     2012, 2013, 2014, 2015
 };
 
-#define SOLAR_CYCLE_LENGTH 28
 static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
     5, 0, 1, 2,     /* 0       2016 - 2019 */
     3, 5, 6, 0,     /* 4  */
