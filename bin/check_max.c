@@ -6,6 +6,12 @@
 
 time_t Time_Zero = 0;
 
+/* Visual C++ 2008's difftime() can't do negative times */
+double my_difftime(time_t left, time_t right) {
+	double diff = (double)left - (double)right;
+	return diff;
+}
+
 void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name ) {
     struct tm *date;
     time_t time = 0;
@@ -47,7 +53,7 @@ void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name )
         }
     } while(time_change > 0);
 
-    printf("%20s max %.0f\n", func_name, difftime(last_time, Time_Zero));
+    printf("%20s max %.0f\n", func_name, my_difftime(last_time, Time_Zero));
 }
 
 
@@ -78,21 +84,21 @@ void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name )
     time_change = last_time / 2;
 
     do {
-        time -= time_change;
+        time += time_change;
 
         date = (*date_func)(&time);
 
         /* gmtime() broke or tm_year overflowed or time_t overflowed */
-        if(date == NULL || date->tm_year < 69 || time < last_time) {
+        if(date == NULL || date->tm_year > 70 || time > last_time) {
             time = last_time;
             time_change = time_change / 2;
         }
         else {
             last_time = time;
         }
-    } while(time_change > 0);
+    } while(time_change < 0);
 
-    printf("%20s min %.0f\n", func_name, difftime(last_time, Time_Zero));
+    printf("%20s min %.0f\n", func_name, my_difftime(last_time, Time_Zero));
 }
 
 
@@ -104,4 +110,3 @@ int main(void) {
 
     return 0;
 }
-
