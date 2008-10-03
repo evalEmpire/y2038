@@ -510,7 +510,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
         gm_tm.tm_year < (1902 - 1900)
        )
     {
-        gm_tm.tm_year = safe_year(gm_tm.tm_year + 1900) - 1900;
+        gm_tm.tm_year = safe_year((Year)(gm_tm.tm_year + 1900)) - 1900;
     }
 
     safe_time = timegm64(&gm_tm);
