@@ -45,7 +45,6 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 #include <string.h>
 #include <time.h>
 #include <errno.h>
-#include <math.h>
 #include "time64.h"
 
 static const int days_in_month[2][12] = {
@@ -359,9 +358,9 @@ struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
 struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
 {
     int v_tm_sec, v_tm_min, v_tm_hour, v_tm_mon, v_tm_wday;
-    Int64 v_tm_tday;
+    Time64_T v_tm_tday;
     int leap;
-    Int64 m;
+    Time64_T m;
     Time64_T time = *in_time;
     Year year = 70;
     int cycles = 0;
@@ -413,7 +412,7 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
 
     if (m >= 0) {
         /* Gregorian cycles, this is huge optimization for distant times */
-        cycles = floor(m / (Time64_T) days_in_gregorian_cycle);
+        cycles = m / (Time64_T) days_in_gregorian_cycle;
         if( cycles ) {
             m -= (cycles * (Time64_T) days_in_gregorian_cycle);
             year += (cycles * years_in_gregorian_cycle);
@@ -437,7 +436,7 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
         year--;
 
         /* Gregorian cycles */
-        cycles = ceil(m / (Time64_T) days_in_gregorian_cycle) + 1;
+        cycles = (m / (Time64_T) days_in_gregorian_cycle) + 1;
         if( cycles ) {
             m -= (cycles * (Time64_T) days_in_gregorian_cycle);
             year += (cycles * years_in_gregorian_cycle);
