@@ -108,7 +108,7 @@ static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
 )
 
 
-static int is_exception_century(Int64 year)
+static int is_exception_century(Year year)
 {
     int is_exception = ((year % 100 == 0) && !(year % 400 == 0));
     /* printf("is_exception_century: %s\n", is_exception ? "yes" : "no"); */
@@ -118,9 +118,9 @@ static int is_exception_century(Int64 year)
 
 
 Time64_T timegm64(struct TM *date) {
-    int   days    = 0;
-    Int64 seconds = 0;
-    Int64 year;
+    int      days    = 0;
+    Time64_T seconds = 0;
+    Year     year;
 
     if( date->tm_year > 70 ) {
         year = 70;
@@ -148,7 +148,7 @@ Time64_T timegm64(struct TM *date) {
     seconds += date->tm_min * 60;
     seconds += date->tm_sec;
 
-    return((Time64_T)seconds);
+    return(seconds);
 }
 
 
