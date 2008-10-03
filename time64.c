@@ -467,10 +467,14 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
         return NULL;
     }
 
+    /* At this point m is less than a year so casting to an int is safe */
     p->tm_mday = (int) m + 1;
-    p->tm_yday = (int) julian_days_by_month[leap][v_tm_mon] + m;
-    p->tm_sec = v_tm_sec, p->tm_min = v_tm_min, p->tm_hour = v_tm_hour,
-        p->tm_mon = v_tm_mon, p->tm_wday = v_tm_wday;
+    p->tm_yday = julian_days_by_month[leap][v_tm_mon] + (int)m;
+    p->tm_sec  = v_tm_sec;
+    p->tm_min  = v_tm_min;
+    p->tm_hour = v_tm_hour;
+    p->tm_mon  = v_tm_mon;
+    p->tm_wday = v_tm_wday;
     
     assert(check_tm(p));
 
