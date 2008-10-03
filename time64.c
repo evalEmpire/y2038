@@ -118,13 +118,6 @@ static int is_exception_century(Int64 year)
 }
 
 
-/* timegm() is a GNU extension, so emulate it here if we need it */
-#ifdef HAS_TIMEGM
-#    define TIMEGM(n) timegm(n);
-#else
-#    define TIMEGM(n) ((time_t)timegm64(n));
-#endif
-
 Time64_T timegm64(struct TM *date) {
     int   days    = 0;
     Int64 seconds = 0;
@@ -286,7 +279,7 @@ void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
 #           endif
 
 #           ifdef HAS_TM_TM_ZONE
-                dest->tm_tmzone  = src->tm_tmzone;
+                dest->tm_zone  = src->tm_zone;
 #           endif
 
 #       else
@@ -318,7 +311,7 @@ void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
 #           endif
 
 #           ifdef HAS_TM_TM_ZONE
-                dest->tm_tmzone  = src->tm_tmzone;
+                dest->tm_zone  = src->tm_zone;
 #           endif
 
 #       else
@@ -520,7 +513,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
         gm_tm.tm_year = safe_year(gm_tm.tm_year + 1900) - 1900;
     }
 
-    safe_time = TIMEGM(&gm_tm);
+    safe_time = timegm64(&gm_tm);
     if( LOCALTIME_R(&safe_time, &safe_date) == NULL )
         return NULL;
 

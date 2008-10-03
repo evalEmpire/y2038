@@ -6,7 +6,7 @@
 #include "time64.c"
 
 
-static void year_to_TM(const Int64 year, struct TM *date) {
+static void year_to_TM(const Year year, struct TM *date) {
     Time64_T time;
 
     date->tm_year = year - 1900;
@@ -21,7 +21,7 @@ static void year_to_TM(const Int64 year, struct TM *date) {
 }
 
 
-static void year_to_tm(const Int64 year, struct tm *ret) {
+static void year_to_tm(const Year year, struct tm *ret) {
     Time64_T time;
     struct TM date;
 
@@ -38,14 +38,14 @@ static void year_to_tm(const Int64 year, struct tm *ret) {
 }
 
 
-static void test_safe_year(Int64 orig_year) {
+static void test_safe_year(Year orig_year) {
     int year = safe_year( orig_year );
     struct tm safe_tm;
     struct TM orig_tm;
 
-    year_to_tm((Int64)year, &safe_tm);
+    year_to_tm((Year)year, &safe_tm);
     year_to_TM(orig_year, &orig_tm);
-    is_int( orig_tm.tm_year, orig_year - 1900, "year_to_tm(orig)" );
+    is_ll( orig_tm.tm_year, (Year)(orig_year - 1900), "year_to_tm(orig)" );
     is_int( safe_tm.tm_year, year - 1900, "year_to_TM(safe)" );
 
     ok(1, "orig_year: %lld, safe_year: %d", orig_year, year);
@@ -54,26 +54,26 @@ static void test_safe_year(Int64 orig_year) {
 
     year--;
     orig_year--;
-    year_to_tm((Int64)year, &safe_tm);
+    year_to_tm((Year)year, &safe_tm);
     year_to_TM(orig_year, &orig_tm);
     is_int( safe_tm.tm_wday, orig_tm.tm_wday,                           "  previous tm_wday" );
     is_int( IS_LEAP( year - 1900 ), IS_LEAP( orig_year - 1900 ),   "  previous ISLEAP()" );
 
     year += 2;
     orig_year += 2;
-    year_to_tm((Int64)year, &safe_tm);
+    year_to_tm((Year)year, &safe_tm);
     year_to_TM(orig_year, &orig_tm);
     is_int( safe_tm.tm_wday, orig_tm.tm_wday,                           "  next tm_wday" );
     /* Don't care about the next leap status */
 }
 
 int main(void) {
-    int year;
+    Year year;
 
     /* Boundry tests */
-    test_safe_year(1);
-    test_safe_year(0);
-    test_safe_year(-1);
+    test_safe_year((Year)1);
+    test_safe_year((Year)0);
+    test_safe_year((Year)-1);
     
 
     for( year = 1599;  year <= 2401;  year++ ) {

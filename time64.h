@@ -46,6 +46,7 @@
 #define USE_SYSTEM_LOCALTIME    1
 #define USE_SYSTEM_GMTIME       1
 
+#define USE_TM64
 
 #ifdef USE_TM64
 #define TM      TM64
