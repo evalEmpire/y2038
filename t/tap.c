@@ -66,24 +66,6 @@ int is_int(const int have, const int want, const char *message, ...) {
 }
 
 
-int is_ll(const long long have, const long long want, const char *message, ...) {
-    int test = (have == want);
-    va_list args;
-    va_start(args, message);
-
-    ok( test, message, args );
-
-    if( !test ) {
-        diag("have: %lld", have);
-        diag("want: %lld", want);
-    }
-
-    va_end(args);
-
-    return test;
-}
-
-
 int is_Int64(const Int64 have, const Int64 want, const char *name) {
     int test = (have == want);
     ok( test, name );
@@ -106,7 +88,7 @@ int tm_ok(const struct TM *have,
 {
     int ok = 1;
 
-    ok *= is_ll((Year)have->tm_year, (Year)year,  "tm.year");
+    ok *= is_Int64((Year)have->tm_year, (Year)year,  "tm.year");
     ok *= is_int(have->tm_mon,  mon,   "   month");
     ok *= is_int(have->tm_mday, mday,  "   day");
     ok *= is_int(have->tm_hour, hour,  "   hour");

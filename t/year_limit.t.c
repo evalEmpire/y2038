@@ -32,7 +32,7 @@ int main(void)
         gtime.tm_sec
     );
 
-    is_ll( (Year)(gtime.tm_year + 1900), expected_year,  "gtime.tm_year" );
+    is_Int64( (Year)(gtime.tm_year + 1900), expected_year,  "gtime.tm_year" );
     is_int( gtime.tm_mon + 1,    expected_month, "gtime.tm_mon"  );
     is_int( gtime.tm_mday,       expected_mday,  "gmtime.tm_mday" ); 
 

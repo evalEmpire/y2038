@@ -30,7 +30,7 @@ int main(void) {
     /* It is safe to assume that the year and month
        will be the same, even with a julian/gregorian shift */
     is_not_null( localtime64_r(&time, &date), "localtime" );
-    is_ll((Year)date.tm_year,   (Year)(1833 - 1900),    "localtm.year");
+    is_Int64((Year)date.tm_year,   (Year)(1833 - 1900),    "localtm.year");
     is_int(date.tm_mon,         9,                      "       .mon");
 
 
@@ -42,7 +42,7 @@ int main(void) {
           16, 27, 44);
 
     is_not_null( localtime64_r(&time, &date), "localtime" );
-    is_ll((Year)date.tm_year,   (Year)(-208 - 1900),    "localtm.year");
+    is_Int64((Year)date.tm_year,   (Year)(-208 - 1900),    "localtm.year");
     is_int(date.tm_mon,         4,                      "       .mon");
 
     done_testing();
