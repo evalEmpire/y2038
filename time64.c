@@ -96,16 +96,23 @@ static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
 #define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
 #define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
 
-#define SHOULD_USE_SYSTEM_LOCALTIME(a)  (       \
-    USE_SYSTEM_LOCALTIME        &&              \
+#ifdef USE_SYSTEM_LOCALTIME
+#    define SHOULD_USE_SYSTEM_LOCALTIME(a)  (       \
     (a) <= SYSTEM_LOCALTIME_MAX &&              \
     (a) >= SYSTEM_LOCALTIME_MIN                 \
 )
-#define SHOULD_USE_SYSTEM_GMTIME(a)     (       \
-    USE_SYSTEM_GMTIME           &&              \
+#else
+#    define SHOULD_USE_SYSTEM_LOCALTIME(a)      (0)
+#endif
+
+#ifdef USE_SYSTEM_GMTIME
+#    define SHOULD_USE_SYSTEM_GMTIME(a)     (       \
     (a) <= SYSTEM_GMTIME_MAX    &&              \
     (a) >= SYSTEM_GMTIME_MIN                    \
 )
+#else
+#    define SHOULD_USE_SYSTEM_GMTIME(a)         (0)
+#endif
 
 
 static int is_exception_century(Year year)

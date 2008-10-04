@@ -10,7 +10,7 @@ LINK     = $(COMPILE)
 
 all : time64.o
 
-time64.o : time64.h time64.c Makefile
+time64.o : time64_config.h time64.h time64.c Makefile
 
 t/bench : t/bench.c time64.o
 	$(LINK) time64.o t/bench.c -o $@
