@@ -6,7 +6,10 @@
    Doesn't work properly yet. Not integrated with the Makefile.
 
    To compile:
-   gcc -g -Wall -std=c99 -pedantic -DUSE_TM64 -DSTRFTIME64_BUILD_MAIN -o strftime64 -g strtime64.c time64.o -lm
+   gcc -g -Wall -std=c99 -pedantic -DUSE_TM64 -DSTRFTIME64_BUILD_MAIN \
+     -o strftime64 -g strtime64.c time64.o -lm
+
+   You might also want -DHANDLE_MBCS, -DENCODING_IS_[UN]SAFE, see below
 
    Note you'll need to have USE_TM64 set for time64.o
 
@@ -20,21 +23,80 @@
    TO DO
      * Fix the ANSI problems.
      * Do the currently missing formats
+     * And the modifiers
+     * And the widths...
      * wchars
      * could do with better commenting
 
 */
 
+#undef WE_HAVE_C99
+#if defined(__STDC_VERSION__)&&(__STDC_VERSION__>=199901L)
+#  define WE_HAVE_C99
+#endif
+
+/* ENCODING_IS_SAFE and ENCODING_IS_UNSAFE are designed to declare whether
+   the character encoding is safe against "accidentally" having a % character
+   which is part of an MBC. UNSAFE is the, er, safe one because it assumes
+   nothing about the encoding, however, this isn't available in bog-standard
+   ANSI since mblen &c are not available until C99. We try to handle this
+   below. ENCODING_IS_SAFE can be set for ASCII/ISO646, and indeed those and
+   upward compatible encodings are the only things we can handle for ANSI.
+
+   If neither is defined, we look for UTF8. If we have UTF8, we act like
+   SAFE, otherwise like UNSAFE. So basically set them if you know for
+   certain one thing or the other. glibc is UTF8 so you can set SAFE for thet.
+
+   These are irrelevant without HANDLE_MBCS, in which case we'll set SAFE
+   unless we have something silly in the compilation settings. Don't do
+   silly things in the compilation settings.
+*/
+#ifdef HANDLE_MBCS
+#  ifndef WE_HAVE_C99
+/* We can't handle MBCS unless we find a proprietory way, which we'll handle
+   as it comes up, since I've no way of knowing this in advance */
+#    error "C environment is pre-C99. Cannot handle MBCS"
+/* Otherwise do nothing, the settings of ENCODING_IS_[UN]SAFE carry through */
+#  endif
+#else
+/* No MBCS. We error if UNSAFE is indicated, and define safe if it isn't
+   already, since this is ASCII or (just possibly) EBCDIC, or something
+   related to them */
+#  ifdef ENCODING_IS_UNSAFE
+#    error "Encoding unsafe in a non-MBCS environment. This makes no sense"
+#  endif
+#  undef ENCODING_IS_SAFE
+#  define ENCODING_IS_SAFE
+#endif
+#if defined(ENCODING_IS_SAFE)&&defined(ENCODING_IS_UNSAFE)
+#  error "Enconding can't be safe and unsafe at the same time. Try unsafe - it's safe with all encodings"
+#endif
+
 /* These are standard */
-#include <string.h>
-#include <wchar.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <stdio.h>
+#include <string.h>  /* we have lots of string processing, it goes without
+			saying */
+#include <wchar.h>   /* MBCS functions are in here if we have them, but we
+			need wchars for the wchar version anyway */
+#include <stdlib.h>  /* mblen and related, if we have them. The inclusion
+			does no harm if we don't */
+#include <assert.h>  /* self explanatory */
+#include <stdio.h>   /* strnprintf if we have it */
 /* This I'm pretty sure is X/OPEN, but any *nix worth its salt will have it.
    We'll have to figure out what to do with other platforms in the fullness
-   of time. */
+   of time.
+  
+   You'll probably tank out here if you're not X/OPEN compliant, but since
+   I don't know the equivalent on whatever platform you're using, I don't
+   know in advance what to do about it. Raise a complaint if you hit it ;) */
 #include <langinfo.h>
+/* Standard bools or fake bools... */
+#ifdef WE_HAVE_C99
+#  include <stdbool.h>
+#else
+#  define bool int
+#  define true 1
+#  define false 0
+#endif
 
 #include "time64.h"
 
@@ -58,11 +120,13 @@ size_t strftime64(char * s, size_t max, const char * format,
   char const * enc=nl_langinfo(CODESET);
   /* I toyed with checking for a various charsets here, but I don't think it's
      efficient: is the number of comparisons we'll do in processing the loop
-     worth running strcmp here?
+     worth running strcmp a bunch of times here?
 
      UTF8 will catch nearly every practical system these days, and
      the "unsafe" path is, er, safe if it _is_ safe... Note that glibc is
-     UTF8 all through, so you can set ENCODING_IS_SAFE. */
+     UTF8 all through, so you can set ENCODING_IS_SAFE.
+    
+     The subject is open for discussion ;) */
   const int enc_is_safe=strcmp(enc, "UTF-8")==0;
 #  endif
 #endif
@@ -222,7 +286,7 @@ size_t strftime64(char * s, size_t max, const char * format,
              it's hence at lease 2 digits. This is debatable, so, give feedback
              if you want it changing... */
           n_wr=snprintf(s+output_pos, max-output_pos,
-            "%2lld", (long long)tm->tm_year/100);
+            "%2lld", (long long)(tm->tm_year+1900)/100);
         move_on:
           ++format;
           if(n_wr>0)
@@ -327,7 +391,7 @@ size_t strftime64(char * s, size_t max, const char * format,
   
         case 'Y':
           n_wr=snprintf(s+output_pos, max-output_pos, "%4lld",
-            (long long)tm->tm_year);
+            (long long)tm->tm_year+1900);
           goto move_on;
   
         case 'y':
