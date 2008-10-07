@@ -25,6 +25,9 @@
      * Do the currently missing formats
      * And the modifiers
      * And the widths...
+     * Check uncalculated fields Do The Right Thing
+     * BCE/CE/BC/AD problems
+     * Figure out what to do about ISO8601
      * wchars
      * could do with better commenting
 
@@ -80,7 +83,8 @@
 #include <stdlib.h>  /* mblen and related, if we have them. The inclusion
 			does no harm if we don't */
 #include <assert.h>  /* self explanatory */
-#include <stdio.h>   /* strnprintf if we have it */
+#include <stdio.h>   /* We don't do any IO, but snprintf lives here if we
+                        have it. */
 /* This I'm pretty sure is X/OPEN, but any *nix worth its salt will have it.
    We'll have to figure out what to do with other platforms in the fullness
    of time.
@@ -96,6 +100,18 @@
 #  define bool int
 #  define true 1
 #  define false 0
+#endif
+/* Deal with dinosaurs. ANSI says there is no snprintf; OTOH everything has
+   had one since about 1992. We detect on C99 - if we have it, we have snprintf
+   You can define HAS_SNPRINTF outside to override if you have one really
+   even though you're not C99
+
+   Actually might get away without this. I'll leave the preprocessing in here
+   in case we do, remove it later if it turns out we can get around it.
+*/
+#ifdef WE_HAVE_C99
+#  undef HAS_SNPRINTF
+#  define HAS_SNPRINTF
 #endif
 
 #include "time64.h"
@@ -135,6 +151,11 @@ size_t strftime64(char * s, size_t max, const char * format,
   state=copying_input;
   while(*format&&(output_pos<max)) {
     char const * format_start_pos;
+    int padding=' ';
+    bool force_lc=false;
+    bool swap_case=false;
+    bool alternate_representation=false;
+    bool alternate_numbers=false;
     if(state==copying_input) {
       if(*format=='%') {
         format_start_pos=format++;
@@ -212,30 +233,45 @@ size_t strftime64(char * s, size_t max, const char * format,
            is displayed. */
   
         case '#':
-        case '-':
-        case '^':
-        case '_':
-        case '0':
-        case 'O':
-        case 'E':
-          /* I'll figure these out later */
-          switch(state) {
-            case reading_modifiers:
-              sprintf(dump_buffer, "(Modifier: %c)", (int)*format);
-              output_string=dump_buffer;
-              format++;
-              goto output_some_string;
-  
-            case reading_width:
-              ++format;
-              goto dump_duff_format;
+	  /* The semantics of this are obscure. The Gnu docs state it swaps
+	     the case of the resulting string, but also state that it's not
+	     really useful with anything but %Z. However, surely it might be
+	     useful with %p or %P, or when ^ is used. Not quite sure what to
+	     do atm, but I'll investigate */
+	  swap_case=true;
+	  ++format;
+	  break;
 
-            default:
-              assert(0);
-              break;
-          }
-          break;
-  
+        case '-':
+	  padding=NO_PADDING;
+	  ++format;
+	  break;
+
+        case '^':
+	  force_lc=true;
+	  ++format;
+	  break;
+	  
+        case '_':
+	  padding=' ';
+	  ++format;
+	  break;
+
+        case '0':
+	  padding='0';
+	  ++format;
+	  break;
+
+        case 'E':
+	  alternate_representation=true;
+	  ++format;
+	  break;
+
+        case 'O':
+	  alternate_numbers=true;
+	  ++format;
+	  break;
+
         /* The numbers, apart from 0 which has a dual role. These mean we're
            getting a format width. */
   
@@ -259,7 +295,7 @@ size_t strftime64(char * s, size_t max, const char * format,
               goto output_some_string;
 
             default:
-              assert(0);
+              assert(false);
           }
           break;
   
@@ -289,6 +325,10 @@ size_t strftime64(char * s, size_t max, const char * format,
             "%2lld", (long long)(tm->tm_year+1900)/100);
         move_on:
           ++format;
+          force_lc=false;
+          swap_case=false;
+          alternate_representation=false;
+          alternate_numbers=false;
           if(n_wr>0)
             output_pos+=n_wr;
           /* not a great deal we can do about it if there's an error signaled */
@@ -418,6 +458,10 @@ size_t strftime64(char * s, size_t max, const char * format,
         output_final_string:
           state=copying_input;
           ++format;
+          force_lc=false;
+          swap_case=false;
+          alternate_representation=false;
+          alternate_numbers=false;
         output_some_string:
           {
             size_t n_to_cp=strlen(output_string);
