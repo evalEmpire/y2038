@@ -136,7 +136,7 @@ static int is_exception_century(Year year)
 }
 
 
-Time64_T timegm64(struct TM *date) {
+Time64_T timegm64(const struct TM *date) {
     int      days    = 0;
     Time64_T seconds = 0;
     Year     year;
