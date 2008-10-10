@@ -1,0 +1,1803 @@
+--- a/MANIFEST
++++ b/MANIFEST
+@@ -3622,6 +3622,9 @@ symbian/uid.pl			Helper code for config.pl
+ symbian/version.pl		Helper code for config.pl
+ symbian/xsbuild.pl		Building extensions
+ taint.c				Tainting code
++time64.c                        64 bit clean time.h (code)
++time64.h                        64 bit clean time.h (header)
++time64_config.h                 64 bit clean time.h (configuration)
+ t/base/cond.t			See if conditionals work
+ t/base/if.t			See if if works
+ t/base/lex.t			See if lexical items work
+diff --git a/lib/Time/Local.pm b/lib/Time/Local.pm
+index 4044cd9..e5c4f88 100644
+--- a/lib/Time/Local.pm
++++ b/lib/Time/Local.pm
+@@ -4,7 +4,6 @@ require Exporter;
+ use Carp;
+ use Config;
+ use strict;
+-use integer;
+ 
+ use vars qw( $VERSION @ISA @EXPORT @EXPORT_OK );
+ $VERSION   = '1.18_01';
+@@ -29,13 +28,8 @@ use constant SECS_PER_MINUTE => 60;
+ use constant SECS_PER_HOUR   => 3600;
+ use constant SECS_PER_DAY    => 86400;
+ 
+-my $MaxInt = ( ( 1 << ( 8 * $Config{ivsize} - 2 ) ) - 1 ) * 2 + 1;
+-my $MaxDay = int( ( $MaxInt - ( SECS_PER_DAY / 2 ) ) / SECS_PER_DAY ) - 1;
+-
+-if ( $^O eq 'MacOS' ) {
+-    # time_t is unsigned...
+-    $MaxInt = ( 1 << ( 8 * $Config{ivsize} ) ) - 1;
+-}
++# localtime()'s limit is the year 2**31
++my $MaxDay = 365 * (2**31);
+ 
+ # Determine the EPOC day for this machine
+ my $Epoc = 0;
+@@ -65,13 +59,13 @@ sub _daygm {
+     return $_[3] + (
+         $Cheat{ pack( 'ss', @_[ 4, 5 ] ) } ||= do {
+             my $month = ( $_[4] + 10 ) % 12;
+-            my $year  = $_[5] + 1900 - $month / 10;
++            my $year  = $_[5] + 1900 - int($month / 10);
+ 
+             ( ( 365 * $year )
+-              + ( $year / 4 )
+-              - ( $year / 100 )
+-              + ( $year / 400 )
+-              + ( ( ( $month * 306 ) + 5 ) / 10 )
++              + int( $year / 4 )
++              - int( $year / 100 )
++              + int( $year / 400 )
++              + int( ( ( $month * 306 ) + 5 ) / 10 )
+             )
+             - $Epoc;
+         }
+@@ -278,16 +272,6 @@ absolute four digit year instead.
+ The scheme above allows interpretation of a wide range of dates,
+ particularly if 4-digit years are used.
+ 
+-=head2 Limits of time_t
+-
+-The range of dates that can be actually be handled depends on the size
+-of C<time_t> (usually a signed integer) on the given
+-platform. Currently, this is 32 bits for most systems, yielding an
+-approximate range from Dec 1901 to Jan 2038.
+-
+-Both C<timelocal()> and C<timegm()> croak if given dates outside the
+-supported range.
+-
+ =head2 Ambiguous Local Times (DST)
+ 
+ Because of DST changes, there are many time zones where the same local
+@@ -310,17 +294,6 @@ for the "Europe/Paris" time zone, the local clock jumped from
+ If the C<timelocal()> function is given a non-existent local time, it
+ will simply return an epoch value for the time one hour later.
+ 
+-=head2 Negative Epoch Values
+-
+-Negative epoch (C<time_t>) values are not officially supported by the
+-POSIX standards, so this module's tests do not test them. On some
+-systems, they are known not to work. These include MacOS (pre-OSX) and
+-Win32.
+-
+-On systems which do support negative epoch values, this module should
+-be able to cope with dates before the start of the epoch, down the
+-minimum value of time_t for the system.
+-
+ =head1 IMPLEMENTATION
+ 
+ These routines are quite efficient and yet are always guaranteed to
+diff --git a/lib/Time/Local.t b/lib/Time/Local.t
+index 22138cf..17e8115 100755
+--- a/lib/Time/Local.t
++++ b/lib/Time/Local.t
+@@ -25,10 +25,10 @@ my @time =
+    # leap day
+    [2020,  2, 29, 12, 59, 59],
+    [2030,  7,  4, 17, 07, 06],
+-# The following test fails on a surprising number of systems
+-# so it is commented out. The end of the Epoch for a 32-bit signed
+-# implementation of time_t should be Jan 19, 2038  03:14:07 UTC.
+-#  [2038,  1, 17, 23, 59, 59],     # last full day in any tz
++   [2038,  1, 17, 23, 59, 59],     # last full day in any tz
++
++   # more than 2**31 time_t
++   [2258,  8, 11,  1, 49, 17],
+   );
+ 
+ my @bad_time =
+@@ -62,17 +62,6 @@ my @years =
+      [ 2100 => 0 ],
+     );
+ 
+-# Use 3 days before the start of the epoch because with Borland on
+-# Win32 it will work for -3600 _if_ your time zone is +01:00 (or
+-# greater).
+-my $neg_epoch_ok = defined ((localtime(-259200))[0]) ? 1 : 0;
+-
+-# use vmsish 'time' makes for oddness around the Unix epoch
+-if ($^O eq 'VMS') {
+-    $time[0][2]++;
+-    $neg_epoch_ok = 0; # time_t is unsigned
+-}
+-
+ my $tests = (@time * 12);
+ $tests += @neg_time * 12;
+ $tests += @bad_time;
+@@ -88,42 +77,39 @@ for (@time, @neg_time) {
+     $year -= 1900;
+     $mon--;
+ 
+- SKIP: {
+-        skip '1970 test on VOS fails.', 12
+-            if $^O eq 'vos' && $year == 70;
+-        skip 'this platform does not support negative epochs.', 12
+-            if $year < 70 && ! $neg_epoch_ok;
+-
+-        {
+-            my $year_in = $year < 70 ? $year + 1900 : $year;
+-            my $time = timelocal($sec,$min,$hour,$mday,$mon,$year_in);
+-
+-            my($s,$m,$h,$D,$M,$Y) = localtime($time);
+-
+-            is($s, $sec, "timelocal second for @$_");
+-            is($m, $min, "timelocal minute for @$_");
+-            is($h, $hour, "timelocal hour for @$_");
+-            is($D, $mday, "timelocal day for @$_");
+-            is($M, $mon, "timelocal month for @$_");
+-            is($Y, $year, "timelocal year for @$_");
+-        }
+-
+-        {
+-            my $year_in = $year < 70 ? $year + 1900 : $year;
+-            my $time = timegm($sec,$min,$hour,$mday,$mon,$year_in);
+-
+-            my($s,$m,$h,$D,$M,$Y) = gmtime($time);
+-
+-            is($s, $sec, "timegm second for @$_");
+-            is($m, $min, "timegm minute for @$_");
+-            is($h, $hour, "timegm hour for @$_");
+-            is($D, $mday, "timegm day for @$_");
+-            is($M, $mon, "timegm month for @$_");
+-            is($Y, $year, "timegm year for @$_");
+-        }
++    # Test timelocal()
++    {
++        my $year_in = $year < 70 ? $year + 1900 : $year;
++        my $time = timelocal($sec,$min,$hour,$mday,$mon,$year_in);
++
++        my($s,$m,$h,$D,$M,$Y) = localtime($time);
++
++        is($s, $sec, "timelocal second for @$_");
++        is($m, $min, "timelocal minute for @$_");
++        is($h, $hour, "timelocal hour for @$_");
++        is($D, $mday, "timelocal day for @$_");
++        is($M, $mon, "timelocal month for @$_");
++        is($Y, $year, "timelocal year for @$_");
++    }
++
++
++    # Test timegm()
++    {
++        my $year_in = $year < 70 ? $year + 1900 : $year;
++        my $time = timegm($sec,$min,$hour,$mday,$mon,$year_in);
++
++        my($s,$m,$h,$D,$M,$Y) = gmtime($time);
++
++        is($s, $sec, "timegm second for @$_");
++        is($m, $min, "timegm minute for @$_");
++        is($h, $hour, "timegm hour for @$_");
++        is($D, $mday, "timegm day for @$_");
++        is($M, $mon, "timegm month for @$_");
++        is($Y, $year, "timegm year for @$_");
+     }
+ }
+ 
++
+ for (@bad_time) {
+     my($year, $mon, $mday, $hour, $min, $sec) = @$_;
+     $year -= 1900;
+@@ -166,11 +152,7 @@ for my $p (@years) {
+         "$year $string a leap year" );
+ }
+ 
+-SKIP:
+ {
+-    skip 'this platform does not support negative epochs.', 6
+-        unless $neg_epoch_ok;
+-
+     eval { timegm(0,0,0,29,1,1900) };
+     like($@, qr/Day '29' out of range 1\.\.28/,
+          'does not accept leap day in 1900');
+diff --git a/lib/Time/gmtime.t b/lib/Time/gmtime.t
+index 853ec3b..9c77f81 100644
+--- a/lib/Time/gmtime.t
++++ b/lib/Time/gmtime.t
+@@ -3,55 +3,25 @@
+ BEGIN {
+     chdir 't' if -d 't';
+     @INC = '../lib';
+-}
+ 
+-BEGIN {
+-    our $hasgm;
+-    eval { my $n = gmtime 0 };
+-    $hasgm = 1 unless $@ && $@ =~ /unimplemented/;
+-    unless ($hasgm) { print "1..0 # Skip: no gmtime\n"; exit 0 }
++    require "./test.pl";
+ }
+ 
++my(@times, @methods);
+ BEGIN {
+-    our @gmtime = gmtime 0; # This is the function gmtime.
+-    unless (@gmtime) { print "1..0 # Skip: gmtime failed\n"; exit 0 }
+-}
+-
+-print "1..10\n";
+-
+-use Time::gmtime;
+-
+-print "ok 1\n";
+-
+-my $gmtime = gmtime 0 ; # This is the OO gmtime.
+-
+-print "not " unless $gmtime->sec   == $gmtime[0];
+-print "ok 2\n";
+-
+-print "not " unless $gmtime->min   == $gmtime[1];
+-print "ok 3\n";
+-
+-print "not " unless $gmtime->hour  == $gmtime[2];
+-print "ok 4\n";
+-
+-print "not " unless $gmtime->mday  == $gmtime[3];
+-print "ok 5\n";
+-
+-print "not " unless $gmtime->mon   == $gmtime[4];
+-print "ok 6\n";
+-
+-print "not " unless $gmtime->year  == $gmtime[5];
+-print "ok 7\n";
+-
+-print "not " unless $gmtime->wday  == $gmtime[6];
+-print "ok 8\n";
+-
+-print "not " unless $gmtime->yday  == $gmtime[7];
+-print "ok 9\n";
+-
+-print "not " unless $gmtime->isdst == $gmtime[8];
+-print "ok 10\n";
++    @times   = (-2**62, -2**50, -2**33, -2**31-1, -1, 0, 1, 2**31-1, 2**33, 2**50, 2**62, time);
++    @methods = qw(sec min hour mday mon year wday yday isdst);
+ 
++    plan tests => (@times * @methods) + 1;
+ 
++    use_ok Time::gmtime;
++}
+ 
++for my $time (@times) {
++    my $gmtime = gmtime $time;          # This is the OO gmtime.
++    my @gmtime = CORE::gmtime $time;    # This is the gmtime function
+ 
++    for my $method (@methods) {
++        is $gmtime->$method, shift @gmtime, "gmtime($time)->$method";
++    }
++}
+diff --git a/lib/Time/localtime.t b/lib/Time/localtime.t
+index 357615c..f300343 100644
+--- a/lib/Time/localtime.t
++++ b/lib/Time/localtime.t
+@@ -3,55 +3,25 @@
+ BEGIN {
+     chdir 't' if -d 't';
+     @INC = '../lib';
+-}
+ 
+-BEGIN {
+-    our $haslocal;
+-    eval { my $n = localtime 0 };
+-    $haslocal = 1 unless $@ && $@ =~ /unimplemented/;
+-    unless ($haslocal) { print "1..0 # Skip: no localtime\n"; exit 0 }
++    require "./test.pl";
+ }
+ 
++my(@times, @methods);
+ BEGIN {
+-    our @localtime = localtime 0; # This is the function localtime.
+-    unless (@localtime) { print "1..0 # Skip: localtime failed\n"; exit 0 }
+-}
+-
+-print "1..10\n";
+-
+-use Time::localtime;
+-
+-print "ok 1\n";
+-
+-my $localtime = localtime 0 ; # This is the OO localtime.
+-
+-print "not " unless $localtime->sec   == $localtime[0];
+-print "ok 2\n";
+-
+-print "not " unless $localtime->min   == $localtime[1];
+-print "ok 3\n";
+-
+-print "not " unless $localtime->hour  == $localtime[2];
+-print "ok 4\n";
+-
+-print "not " unless $localtime->mday  == $localtime[3];
+-print "ok 5\n";
+-
+-print "not " unless $localtime->mon   == $localtime[4];
+-print "ok 6\n";
+-
+-print "not " unless $localtime->year  == $localtime[5];
+-print "ok 7\n";
+-
+-print "not " unless $localtime->wday  == $localtime[6];
+-print "ok 8\n";
+-
+-print "not " unless $localtime->yday  == $localtime[7];
+-print "ok 9\n";
+-
+-print "not " unless $localtime->isdst == $localtime[8];
+-print "ok 10\n";
++    @times   = (-2**62, -2**50, -2**33, -2**31-1, -1, 0, 1, 2**31-1, 2**33, 2**50, 2**62, time);
++    @methods = qw(sec min hour mday mon year wday yday isdst);
+ 
++    plan tests => (@times * @methods) + 1;
+ 
++    use_ok Time::localtime;
++}
+ 
++for my $time (@times) {
++    my $localtime = localtime $time;          # This is the OO localtime.
++    my @localtime = CORE::localtime $time;    # This is the localtime function
+ 
++    for my $method (@methods) {
++        is $localtime->$method, shift @localtime, "localtime($time)->$method";
++    }
++}
+diff --git a/pod/perlfaq4.pod b/pod/perlfaq4.pod
+index 3200e7a..326ec91 100644
+--- a/pod/perlfaq4.pod
++++ b/pod/perlfaq4.pod
+@@ -516,12 +516,11 @@ Can you use your pencil to write a non-Y2K-compliant memo?  Of course
+ you can.  Is that the pencil's fault?  Of course it isn't.
+ 
+ The date and time functions supplied with Perl (gmtime and localtime)
+-supply adequate information to determine the year well beyond 2000
+-(2038 is when trouble strikes for 32-bit machines).  The year returned
+-by these functions when used in a list context is the year minus 1900.
+-For years between 1910 and 1999 this I<happens> to be a 2-digit decimal
+-number. To avoid the year 2000 problem simply do not treat the year as
+-a 2-digit number.  It isn't.
++supply adequate information to determine the year well beyond 2000 and
++2038.  The year returned by these functions when used in a list
++context is the year minus 1900.  For years between 1910 and 1999 this
++I<happens> to be a 2-digit decimal number. To avoid the year 2000
++problem simply do not treat the year as a 2-digit number.  It isn't.
+ 
+ When gmtime() and localtime() are used in scalar context they return
+ a timestamp string that contains a fully-expanded year.  For example,
+@@ -534,6 +533,15 @@ not the language.  At the risk of inflaming the NRA: "Perl doesn't
+ break Y2K, people do."  See http://www.perl.org/about/y2k.html for
+ a longer exposition.
+ 
++=head2 Does Perl have a Year 2038 problem?
++
++No, all of Perl's built in date and time functions and modules will
++work to about 2 billion years before and after 1970.
++
++Many systems cannot count time past the year 2038.  Older versions of
++Perl were dependent on the system to do date calculation and thus
++shared their 2038 bug.
++
+ =head1 Data: Strings
+ 
+ =head2 How do I validate input?
+diff --git a/pod/perlport.pod b/pod/perlport.pod
+index f8fb1fe..ff1ba39 100644
+--- a/pod/perlport.pod
++++ b/pod/perlport.pod
+@@ -641,9 +641,6 @@ The value for C<$offset> in Unix will be C<0>, but in Mac OS will be
+ some large number.  C<$offset> can then be added to a Unix time value
+ to get what should be the proper value on any system.
+ 
+-On Windows (at least), you shouldn't pass a negative value to C<gmtime> or
+-C<localtime>.
+-
+ =head2 Character sets and character encoding
+ 
+ Assume very little about character sets.
+@@ -1863,7 +1860,10 @@ platforms.  See L<File::Glob> for portability information.
+ 
+ =item gmtime
+ 
+-Same portability caveats as L<localtime>.
++In theory, gmtime() is reliable from -2**63 to 2**63-1.  However,
++because work arounds in the implementation use floating point numbers,
++it will become inaccurate as the time gets larger.  This is a bug and
++will be fixed in the future.
+ 
+ =item ioctl FILEHANDLE,FUNCTION,SCALAR
+ 
+@@ -1914,10 +1914,9 @@ Available on 64 bit OpenVMS 8.2 and later.  (VMS)
+ 
+ =item localtime
+ 
+-Because Perl currently relies on the native standard C localtime()
+-function, it is only safe to use times between 0 and (2**31)-1.  Times
+-outside this range may result in unexpected behavior depending on your
+-operating system's implementation of localtime().
++localtime() has the same range as L<gmtime>, but because time zone
++rules change its accuracy for historical and future times may degrade
++but usually by no more than an hour.
+ 
+ =item lstat
+ 
+diff --git a/pp_sys.c b/pp_sys.c
+index 481864b..26468e6 100644
+--- a/pp_sys.c
++++ b/pp_sys.c
+@@ -27,6 +27,8 @@
+ #include "EXTERN.h"
+ #define PERL_IN_PP_SYS_C
+ #include "perl.h"
++#include "time64.h"
++#include "time64.c"
+ 
+ #ifdef I_SHADOW
+ /* Shadow password support for solaris - pdo@cs.umd.edu
+@@ -199,15 +201,6 @@ void endservent(void);
+ 
+ #undef PERL_EFF_ACCESS	/* EFFective uid/gid ACCESS */
+ 
+-/* AIX 5.2 and below use mktime for localtime, and defines the edge case
+- * for time 0x7fffffff to be valid only in UTC. AIX 5.3 provides localtime64
+- * available in the 32bit environment, which could warrant Configure
+- * checks in the future.
+- */
+-#ifdef  _AIX
+-#define LOCALTIME_EDGECASE_BROKEN
+-#endif
+-
+ /* F_OK unused: if stat() cannot find it... */
+ 
+ #if !defined(PERL_EFF_ACCESS) && defined(HAS_ACCESS) && defined(EFF_ONLY_OK) && !defined(NO_EFF_ONLY_OK)
+@@ -4402,104 +4395,84 @@ PP(pp_tms)
+ #endif /* HAS_TIMES */
+ }
+ 
+-#ifdef LOCALTIME_EDGECASE_BROKEN
+-static struct tm *S_my_localtime (pTHX_ Time_t *tp)
+-{
+-    auto time_t     T;
+-    auto struct tm *P;
+-
+-    /* No workarounds in the valid range */
+-    if (!tp || *tp < 0x7fff573f || *tp >= 0x80000000)
+-	return (localtime (tp));
+-
+-    /* This edge case is to workaround the undefined behaviour, where the
+-     * TIMEZONE makes the time go beyond the defined range.
+-     * gmtime (0x7fffffff) => 2038-01-19 03:14:07
+-     * If there is a negative offset in TZ, like MET-1METDST, some broken
+-     * implementations of localtime () (like AIX 5.2) barf with bogus
+-     * return values:
+-     * 0x7fffffff gmtime               2038-01-19 03:14:07
+-     * 0x7fffffff localtime            1901-12-13 21:45:51
+-     * 0x7fffffff mylocaltime          2038-01-19 04:14:07
+-     * 0x3c19137f gmtime               2001-12-13 20:45:51
+-     * 0x3c19137f localtime            2001-12-13 21:45:51
+-     * 0x3c19137f mylocaltime          2001-12-13 21:45:51
+-     * Given that legal timezones are typically between GMT-12 and GMT+12
+-     * we turn back the clock 23 hours before calling the localtime
+-     * function, and add those to the return value. This will never cause
+-     * day wrapping problems, since the edge case is Tue Jan *19*
+-     */
+-    T = *tp - 82800; /* 23 hour. allows up to GMT-23 */
+-    P = localtime (&T);
+-    P->tm_hour += 23;
+-    if (P->tm_hour >= 24) {
+-	P->tm_hour -= 24;
+-	P->tm_mday++;	/* 18  -> 19  */
+-	P->tm_wday++;	/* Mon -> Tue */
+-	P->tm_yday++;	/* 18  -> 19  */
+-    }
+-    return (P);
+-} /* S_my_localtime */
+-#endif
+-
+ PP(pp_gmtime)
+ {
+     dVAR;
+     dSP;
+-    Time_t when;
+-    const struct tm *tmbuf;
++    Time64_T when;
++    struct TM tmbuf;
++    struct TM *err;
++    char *opname = PL_op->op_type == OP_LOCALTIME ? "localtime" : "gmtime";
+     static const char * const dayname[] =
+ 	{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+     static const char * const monname[] =
+ 	{"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+ 	 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+ 
+-    if (MAXARG < 1)
+-	(void)time(&when);
+-    else
+-#ifdef BIG_TIME
+-	when = (Time_t)SvNVx(POPs);
+-#else
+-	when = (Time_t)SvIVx(POPs);
+-#endif
++    if (MAXARG < 1) {
++	time_t now;
++	(void)time(&now);
++	when = (Time64_T)now;
++    }
++    else {
++	/* XXX POPq uses an SvIV so it won't work with 32 bit integer scalars
++	   using a double causes an unfortunate loss of accuracy on high numbers.
++	   What we really need is an SvQV.
++	*/
++	double input = POPn;
++	when = (Time64_T)input;
++	if( when != input ) {
++	    Perl_warner(aTHX_ packWARN(WARN_OVERFLOW),
++			"%s(%.0f) too large", opname, input);
++	}
++    }
+ 
+     if (PL_op->op_type == OP_LOCALTIME)
+-#ifdef LOCALTIME_EDGECASE_BROKEN
+-	tmbuf = S_my_localtime(aTHX_ &when);
+-#else
+-	tmbuf = localtime(&when);
+-#endif
++        err = localtime64_r(&when, &tmbuf);
+     else
+-	tmbuf = gmtime(&when);
++	err = gmtime64_r(&when, &tmbuf);
+ 
+-    if (GIMME != G_ARRAY) {
++    if( err == NULL ) {
++	/* XXX %lld broken for quads */
++	Perl_warner(aTHX_ packWARN(WARN_OVERFLOW),
++		    "%s(%.0f) failed", opname, (double)when);
++    }
++
++    if (GIMME != G_ARRAY) {	/* scalar context */
+ 	SV *tsv;
++	/* XXX newSVpvf()'s %lld type is broken, so cheat with a double */
++	double year = (double)tmbuf.tm_year + 1900;
++
+         EXTEND(SP, 1);
+         EXTEND_MORTAL(1);
+-	if (!tmbuf)
++	if (err == NULL)
+ 	    RETPUSHUNDEF;
+-	tsv = Perl_newSVpvf(aTHX_ "%s %s %2d %02d:%02d:%02d %d",
+-			    dayname[tmbuf->tm_wday],
+-			    monname[tmbuf->tm_mon],
+-			    tmbuf->tm_mday,
+-			    tmbuf->tm_hour,
+-			    tmbuf->tm_min,
+-			    tmbuf->tm_sec,
+-			    tmbuf->tm_year + 1900);
++
++	tsv = Perl_newSVpvf(aTHX_ "%s %s %2d %02d:%02d:%02d %.0f",
++			    dayname[tmbuf.tm_wday],
++			    monname[tmbuf.tm_mon],
++			    tmbuf.tm_mday,
++			    tmbuf.tm_hour,
++			    tmbuf.tm_min,
++			    tmbuf.tm_sec,
++			    year);
+ 	mPUSHs(tsv);
+     }
+-    else if (tmbuf) {
++    else {			/* list context */
++	if ( err == NULL )
++	    RETURN;
++
+         EXTEND(SP, 9);
+         EXTEND_MORTAL(9);
+-        mPUSHi(tmbuf->tm_sec);
+-	mPUSHi(tmbuf->tm_min);
+-	mPUSHi(tmbuf->tm_hour);
+-	mPUSHi(tmbuf->tm_mday);
+-	mPUSHi(tmbuf->tm_mon);
+-	mPUSHi(tmbuf->tm_year);
+-	mPUSHi(tmbuf->tm_wday);
+-	mPUSHi(tmbuf->tm_yday);
+-	mPUSHi(tmbuf->tm_isdst);
++        mPUSHi(tmbuf.tm_sec);
++	mPUSHi(tmbuf.tm_min);
++	mPUSHi(tmbuf.tm_hour);
++	mPUSHi(tmbuf.tm_mday);
++	mPUSHi(tmbuf.tm_mon);
++	mPUSHn(tmbuf.tm_year);
++	mPUSHi(tmbuf.tm_wday);
++	mPUSHi(tmbuf.tm_yday);
++	mPUSHi(tmbuf.tm_isdst);
+     }
+     RETURN;
+ }
+diff --git a/reentr.c b/reentr.c
+index 25fccf8..8d9ab2a 100644
+--- a/reentr.c
++++ b/reentr.c
+@@ -115,10 +115,6 @@ Perl_reentrant_size(pTHX) {
+ #       endif
+ #   endif 
+ #endif /* HAS_GETSPNAM_R */
+-#ifdef HAS_GMTIME_R
+-#endif /* HAS_GMTIME_R */
+-#ifdef HAS_LOCALTIME_R
+-#endif /* HAS_LOCALTIME_R */
+ #ifdef HAS_RANDOM_R
+ #endif /* HAS_RANDOM_R */
+ #ifdef HAS_READDIR_R
+@@ -205,10 +201,6 @@ Perl_reentrant_init(pTHX) {
+ #   endif
+ 	Newx(PL_reentrant_buffer->_spent_buffer, PL_reentrant_buffer->_spent_size, char);
+ #endif /* HAS_GETSPNAM_R */
+-#ifdef HAS_GMTIME_R
+-#endif /* HAS_GMTIME_R */
+-#ifdef HAS_LOCALTIME_R
+-#endif /* HAS_LOCALTIME_R */
+ #ifdef HAS_RANDOM_R
+ #endif /* HAS_RANDOM_R */
+ #ifdef HAS_READDIR_R
+@@ -280,10 +272,6 @@ Perl_reentrant_free(pTHX) {
+ #ifdef HAS_GETSPNAM_R
+ 	Safefree(PL_reentrant_buffer->_spent_buffer);
+ #endif /* HAS_GETSPNAM_R */
+-#ifdef HAS_GMTIME_R
+-#endif /* HAS_GMTIME_R */
+-#ifdef HAS_LOCALTIME_R
+-#endif /* HAS_LOCALTIME_R */
+ #ifdef HAS_RANDOM_R
+ #endif /* HAS_RANDOM_R */
+ #ifdef HAS_READDIR_R
+diff --git a/reentr.h b/reentr.h
+index 05b06f8..e66abd9 100644
+--- a/reentr.h
++++ b/reentr.h
+@@ -185,13 +185,12 @@
+ #define REENTRANT_PROTO_S_SBIE	69
+ #define REENTRANT_PROTO_S_SBW	70
+ #define REENTRANT_PROTO_S_TISBI	71
+-#define REENTRANT_PROTO_S_TS	72
+-#define REENTRANT_PROTO_S_TSBI	73
+-#define REENTRANT_PROTO_S_TSBIE	74
+-#define REENTRANT_PROTO_S_TWISBIE	75
+-#define REENTRANT_PROTO_V_D	76
+-#define REENTRANT_PROTO_V_H	77
+-#define REENTRANT_PROTO_V_ID	78
++#define REENTRANT_PROTO_S_TSBI	72
++#define REENTRANT_PROTO_S_TSBIE	73
++#define REENTRANT_PROTO_S_TWISBIE	74
++#define REENTRANT_PROTO_V_D	75
++#define REENTRANT_PROTO_V_H	76
++#define REENTRANT_PROTO_V_ID	77
+ 
+ /* Defines for indicating which special features are supported. */
+ 
+@@ -740,12 +739,6 @@ typedef struct {
+ 	FILE*	_spent_fptr;
+ #   endif
+ #endif /* HAS_GETSPNAM_R */
+-#ifdef HAS_GMTIME_R
+-	struct tm _gmtime_struct;
+-#endif /* HAS_GMTIME_R */
+-#ifdef HAS_LOCALTIME_R
+-	struct tm _localtime_struct;
+-#endif /* HAS_LOCALTIME_R */
+ #ifdef HAS_RANDOM_R
+ 	struct random_data _random_struct;
+ #   if RANDOM_R_PROTO == REENTRANT_PROTO_I_iS
+@@ -1330,30 +1323,6 @@ typedef struct {
+ #   endif /* HAS_GETSPNAM */
+ #endif /* HAS_GETSPNAM_R */
+ 
+-#ifdef HAS_GMTIME_R
+-#  if defined(PERL_REENTR_API) && (PERL_REENTR_API+0 == 1)
+-#   undef gmtime
+-#   if !defined(gmtime) && GMTIME_R_PROTO == REENTRANT_PROTO_S_TS
+-#       define gmtime(a) (gmtime_r(a, &PL_reentrant_buffer->_gmtime_struct) ? &PL_reentrant_buffer->_gmtime_struct : 0)
+-#  endif /* if defined(PERL_REENTR_API) && (PERL_REENTR_API+0 == 1) */
+-#   if !defined(gmtime) && GMTIME_R_PROTO == REENTRANT_PROTO_I_TS
+-#       define gmtime(a) (gmtime_r(a, &PL_reentrant_buffer->_gmtime_struct) == 0 ? &PL_reentrant_buffer->_gmtime_struct : 0)
+-#  endif /* if defined(PERL_REENTR_API) && (PERL_REENTR_API+0 == 1) */
+-#   endif /* HAS_GMTIME */
+-#endif /* HAS_GMTIME_R */
+-
+-#ifdef HAS_LOCALTIME_R
+-#  if defined(PERL_REENTR_API) && (PERL_REENTR_API+0 == 1)
+-#   undef localtime
+-#   if !defined(localtime) && LOCALTIME_R_PROTO == REENTRANT_PROTO_S_TS
+-#       define localtime(a) (L_R_TZSET localtime_r(a, &PL_reentrant_buffer->_localtime_struct) ? &PL_reentrant_buffer->_localtime_struct : 0)
+-#  endif /* if defined(PERL_REENTR_API) && (PERL_REENTR_API+0 == 1) */
+-#   if !defined(localtime) && LOCALTIME_R_PROTO == REENTRANT_PROTO_I_TS
+-#       define localtime(a) (L_R_TZSET localtime_r(a, &PL_reentrant_buffer->_localtime_struct) == 0 ? &PL_reentrant_buffer->_localtime_struct : 0)
+-#  endif /* if defined(PERL_REENTR_API) && (PERL_REENTR_API+0 == 1) */
+-#   endif /* HAS_LOCALTIME */
+-#endif /* HAS_LOCALTIME_R */
+-
+ #ifdef HAS_RANDOM_R
+ #  if defined(PERL_REENTR_API) && (PERL_REENTR_API+0 == 1)
+ #   undef random
+diff --git a/reentr.pl b/reentr.pl
+index ea327a0..89795cd 100644
+--- a/reentr.pl
++++ b/reentr.pl
+@@ -504,7 +504,7 @@ EOF
+ EOF
+ 	    pushssif $endif;
+ 	}
+-        elsif ($func =~ /^(drand48|gmtime|localtime|random|srandom)$/) {
++        elsif ($func =~ /^(drand48|random|srandom)$/) {
+ 	    pushssif $ifdef;
+ 	    push @struct, <<EOF;
+ 	$seent{$func} _${func}_struct;
+@@ -716,9 +716,6 @@ EOF
+ 	    }
+ 
+ 	    my $call = "${func}_r($v$w)";
+-	    if ($func eq 'localtime') {
+-		$call = "L_R_TZSET $call";
+-	    }
+ 
+             # Must make OpenBSD happy
+             my $memzero = '';
+@@ -1124,8 +1121,6 @@ getservbyname CC|netdb	|struct servent	|I_CCSBWR|S_CCSBI|I_CCSD|D=struct servent
+ getservbyport IC|netdb	|struct servent	|I_ICSBWR|S_ICSBI|I_ICSD|D=struct servent_data*
+ getservent	|netdb	|struct servent	|I_SBWR|I_SBI|S_SBI|I_SD|D=struct servent_data*
+ getspnam C	|shadow	|struct spwd	|I_CSBWR|S_CSBI
+-gmtime T	|time	|struct tm	|S_TS|I_TS|T=const time_t*
+-localtime T	|time	|struct tm	|S_TS|I_TS|T=const time_t*
+ random		|stdlib	|struct random_data|I_iS|I_lS|I_St|i=int*|l=long*|t=int32_t*
+ readdir T	|dirent	|struct dirent	|I_TSR|I_TS|T=DIR*
+ readdir64 T	|dirent	|struct dirent64|I_TSR|I_TS|T=DIR*
+diff --git a/t/.gitignore b/t/.gitignore
+index d49fc84..29360a0 100644
+--- a/t/.gitignore
++++ b/t/.gitignore
+@@ -1 +1,2 @@
+ /perl
++/rantests
+diff --git a/t/op/time.t b/t/op/time.t
+index 8b2f07d..00c5b05 100755
+--- a/t/op/time.t
++++ b/t/op/time.t
+@@ -1,14 +1,12 @@
+ #!./perl
+ 
+-$does_gmtime = gmtime(time);
+-
+ BEGIN {
+     chdir 't' if -d 't';
+     @INC = '../lib';
+     require './test.pl';
+ }
+ 
+-plan tests => 8;
++plan tests => 42;
+ 
+ ($beguser,$begsys) = times;
+ 
+@@ -32,7 +30,9 @@ ok($i >= 2_000_000, 'very basic times test');
+ ($xsec,$foo) = localtime($now);
+ $localyday = $yday;
+ 
+-ok($sec != $xsec && $mday && $year,             'localtime() list context');
++isnt($sec, $xsec),      'localtime() list context';
++ok $mday,               '  month day';
++ok $year,               '  year';
+ 
+ ok(localtime() =~ /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[ ]
+                     (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[ ]
+@@ -56,13 +56,13 @@ $ENV{TZ} = "GMT+5";
+ ok($hour != $hour2,                             'changes to $ENV{TZ} respected');
+ }
+ 
+-SKIP: {
+-    skip "No gmtime()", 3 unless $does_gmtime;
+ 
+ ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = gmtime($beg);
+ ($xsec,$foo) = localtime($now);
+ 
+-ok($sec != $xsec && $mday && $year,             'gmtime() list context');
++isnt($sec, $xsec),      'gmtime() list conext';
++ok $mday,               '  month day';
++ok $year,               '  year';
+ 
+ my $day_diff = $localyday - $yday;
+ ok( grep({ $day_diff == $_ } (0, 1, -1, 364, 365, -364, -365)),
+@@ -76,4 +76,57 @@ ok(gmtime() =~ /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[ ]
+                /x,
+    'gmtime(), scalar context'
+   );
++
++
++
++# Test gmtime over a range of times.
++{
++    # gm/localtime should go all the way from -2**63 to 2**63-1
++    # but floating point hacks mean it gets unreliable for large numbers.
++    my %tests = (
++        # time_t         gmtime list                          scalar
++        -2**35  => [52, 13, 20, 7, 2, -1019, 5, 65, 0, "Fri Mar  7 20:13:52 881"],
++        -2**32  => [44, 31, 17, 24, 10, -67, 0, 327, 0, "Sun Nov 24 17:31:44 1833"],
++        -2**31  => [52, 45, 20, 13, 11, 1, 5, 346, 0, "Fri Dec 13 20:45:52 1901"],
++        -1      => [59, 59, 23, 31, 11, 69, 3, 364, 0, "Wed Dec 31 23:59:59 1969"],
++        0       => [0, 0, 0, 1, 0, 70, 4, 0, 0, "Thu Jan  1 00:00:00 1970"],
++        1       => [1, 0, 0, 1, 0, 70, 4, 0, 0, "Thu Jan  1 00:00:01 1970"],
++        2**30   => [4, 37, 13, 10, 0, 104, 6, 9, 0, "Sat Jan 10 13:37:04 2004"],
++        2**31   => [8, 14, 3, 19, 0, 138, 2, 18, 0, "Tue Jan 19 03:14:08 2038"],
++        2**32   => [16, 28, 6, 7, 1, 206, 0, 37, 0, "Sun Feb  7 06:28:16 2106"],
++        2**39   => [8, 18, 12, 25, 0, 17491, 2, 24, 0, "Tue Jan 25 12:18:08 19391"],
++    );
++
++    for my $time (keys %tests) {
++        my @expected  = @{$tests{$time}};
++        my $scalar    = pop @expected;
++
++        ok eq_array([gmtime($time)], \@expected),  "gmtime($time) list context";
++        is scalar gmtime($time), $scalar,       "  scalar";
++    }
++}
++
++
++# Test localtime
++{
++    # We pick times which fall in the middle of a month, so the month and year should be
++    # the same regardless of the time zone.
++    my %tests = (
++        # time_t           month, year,  scalar
++        -8589934592     => [9,    -203,                 qr/Oct \d+ .* 1697$/],
++        -1296000        => [11,   69,                   qr/Dec \d+ .* 1969$/],
++        1296000         => [0,    70,                   qr/Jan \d+ .* 1970$/],
++        5000000000      => [5,    228,                  qr/Jun \d+ .* 2128$/],
++        1163500000      => [10,   106,                  qr/Nov \d+ .* 2006$/],
++    );
++
++    for my $time (keys %tests) {
++        my @expected  = @{$tests{$time}};
++        my $scalar    = pop @expected;
++
++        my @time = (localtime($time))[4,5];
++        ok( eq_array(\@time, \@expected),  "localtime($time) list context" )
++          or diag("@time");
++        like scalar localtime($time), $scalar,       "  scalar";
++    }
+ }
+diff --git a/time64.c b/time64.c
+new file mode 100644
+index 0000000..e841036
+--- /dev/null
++++ b/time64.c
+@@ -0,0 +1,581 @@
++/* 
++
++Copyright (c) 2007-2008  Michael G Schwern
++
++This software originally derived from Paul Sheer's pivotal_gmtime_r.c.
++
++The MIT License:
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in
++all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++THE SOFTWARE.
++
++*/
++
++/*
++
++Programmers who have available to them 64-bit time values as a 'long
++long' type can use localtime64_r() and gmtime64_r() which correctly
++converts the time even on 32-bit systems. Whether you have 64-bit time 
++values will depend on the operating system.
++
++localtime64_r() is a 64-bit equivalent of localtime_r().
++
++gmtime64_r() is a 64-bit equivalent of gmtime_r().
++
++*/
++
++#include "time64.h"
++
++static const int days_in_month[2][12] = {
++    {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
++    {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
++};
++
++static const int julian_days_by_month[2][12] = {
++    {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334},
++    {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335},
++};
++
++static const int length_of_year[2] = { 365, 366 };
++
++/* Number of days in a 400 year Gregorian cycle */
++static const Year years_in_gregorian_cycle = 400;
++static const int days_in_gregorian_cycle  = (365 * 400) + 100 - 4 + 1;
++
++/* 28 year calendar cycle between 2010 and 2037 */
++#define SOLAR_CYCLE_LENGTH 28
++static const int safe_years[SOLAR_CYCLE_LENGTH] = {
++    2016, 2017, 2018, 2019,
++    2020, 2021, 2022, 2023,
++    2024, 2025, 2026, 2027,
++    2028, 2029, 2030, 2031,
++    2032, 2033, 2034, 2035,
++    2036, 2037, 2010, 2011,
++    2012, 2013, 2014, 2015
++};
++
++static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
++    5, 0, 1, 2,     /* 0       2016 - 2019 */
++    3, 5, 6, 0,     /* 4  */
++    1, 3, 4, 5,     /* 8  */
++    6, 1, 2, 3,     /* 12 */
++    4, 6, 0, 1,     /* 16 */
++    2, 4, 5, 6,     /* 20      2036, 2037, 2010, 2011 */
++    0, 2, 3, 4      /* 24      2012, 2013, 2014, 2015 */
++};
++
++/* Let's assume people are going to be looking for dates in the future.
++   Let's provide some cheats so you can skip ahead.
++   This has a 4x speed boost when near 2008.
++*/
++/* Number of days since epoch on Jan 1st, 2008 GMT */
++#define CHEAT_DAYS  (1199145600 / 24 / 60 / 60)
++#define CHEAT_YEARS 108
++
++#define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
++#define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
++
++#ifdef USE_SYSTEM_LOCALTIME
++#    define SHOULD_USE_SYSTEM_LOCALTIME(a)  (       \
++    (a) <= SYSTEM_LOCALTIME_MAX &&              \
++    (a) >= SYSTEM_LOCALTIME_MIN                 \
++)
++#else
++#    define SHOULD_USE_SYSTEM_LOCALTIME(a)      (0)
++#endif
++
++#ifdef USE_SYSTEM_GMTIME
++#    define SHOULD_USE_SYSTEM_GMTIME(a)     (       \
++    (a) <= SYSTEM_GMTIME_MAX    &&              \
++    (a) >= SYSTEM_GMTIME_MIN                    \
++)
++#else
++#    define SHOULD_USE_SYSTEM_GMTIME(a)         (0)
++#endif
++
++/* Multi varadic macros are a C99 thing, alas */
++#ifdef TIME_64_DEBUG
++#    define TRACE(format) (fprintf(stderr, format))
++#    define TRACE1(format, var1)    (fprintf(stderr, format, var1))
++#    define TRACE2(format, var1, var2)    (fprintf(stderr, format, var1, var2))
++#    define TRACE3(format, var1, var2, var3)    (fprintf(stderr, format, var1, var2, var3))
++#else
++#    define TRACE(format) ((void)0)
++#    define TRACE1(format, var1) ((void)0)
++#    define TRACE2(format, var1, var2) ((void)0)
++#    define TRACE3(format, var1, var2, var3) ((void)0)
++#endif
++
++static int is_exception_century(Year year)
++{
++    int is_exception = ((year % 100 == 0) && !(year % 400 == 0));
++    TRACE1("# is_exception_century: %s\n", is_exception ? "yes" : "no");
++
++    return(is_exception);
++}
++
++
++Time64_T timegm64(struct TM *date) {
++    int      days    = 0;
++    Time64_T seconds = 0;
++    Year     year;
++
++    if( date->tm_year > 70 ) {
++        year = 70;
++        while( year < date->tm_year ) {
++            days += length_of_year[IS_LEAP(year)];
++            year++;
++        }
++    }
++    else if ( date->tm_year < 70 ) {
++        year = 69;
++        do {
++            days -= length_of_year[IS_LEAP(year)];
++            year--;
++        } while( year >= date->tm_year );
++    }
++
++    days += julian_days_by_month[IS_LEAP(date->tm_year)][date->tm_mon];
++    days += date->tm_mday - 1;
++
++    /* Avoid overflowing the days integer */
++    seconds = days;
++    seconds = seconds * 60 * 60 * 24;
++
++    seconds += date->tm_hour * 60 * 60;
++    seconds += date->tm_min * 60;
++    seconds += date->tm_sec;
++
++    return(seconds);
++}
++
++
++static int check_tm(struct TM *tm)
++{
++    /* Don't forget leap seconds */
++    assert(tm->tm_sec >= 0);
++    assert(tm->tm_sec <= 61);
++
++    assert(tm->tm_min >= 0);
++    assert(tm->tm_min <= 59);
++
++    assert(tm->tm_hour >= 0);
++    assert(tm->tm_hour <= 23);
++
++    assert(tm->tm_mday >= 1);
++    assert(tm->tm_mday <= days_in_month[IS_LEAP(tm->tm_year)][tm->tm_mon]);
++
++    assert(tm->tm_mon  >= 0);
++    assert(tm->tm_mon  <= 11);
++
++    assert(tm->tm_wday >= 0);
++    assert(tm->tm_wday <= 6);
++    
++    assert(tm->tm_yday >= 0);
++    assert(tm->tm_yday <= length_of_year[IS_LEAP(tm->tm_year)]);
++
++#ifdef HAS_TM_TM_GMTOFF
++    assert(tm->tm_gmtoff >= -24 * 60 * 60);
++    assert(tm->tm_gmtoff <=  24 * 60 * 60);
++#endif
++
++    return 1;
++}
++
++
++/* The exceptional centuries without leap years cause the cycle to
++   shift by 16
++*/
++static Year cycle_offset(Year year)
++{
++    const Year start_year = 2000;
++    Year year_diff  = year - start_year;
++    Year exceptions;
++
++    if( year > start_year )
++        year_diff--;
++
++    exceptions  = year_diff / 100;
++    exceptions -= year_diff / 400;
++
++    TRACE3("# year: %lld, exceptions: %lld, year_diff: %lld\n",
++          year, exceptions, year_diff);
++
++    return exceptions * 16;
++}
++
++/* For a given year after 2038, pick the latest possible matching
++   year in the 28 year calendar cycle.
++
++   A matching year...
++   1) Starts on the same day of the week.
++   2) Has the same leap year status.
++
++   This is so the calendars match up.
++
++   Also the previous year must match.  When doing Jan 1st you might
++   wind up on Dec 31st the previous year when doing a -UTC time zone.
++
++   Finally, the next year must have the same start day of week.  This
++   is for Dec 31st with a +UTC time zone.
++   It doesn't need the same leap year status since we only care about
++   January 1st.
++*/
++static int safe_year(Year year)
++{
++    int safe_year;
++    Year year_cycle = year + cycle_offset(year);
++
++    /* Change non-leap xx00 years to an equivalent */
++    if( is_exception_century(year) )
++        year_cycle += 11;
++
++    /* Also xx01 years, since the previous year will be wrong */
++    if( is_exception_century(year - 1) )
++        year_cycle += 17;
++
++    year_cycle %= SOLAR_CYCLE_LENGTH;
++    if( year_cycle < 0 ) 
++        year_cycle = SOLAR_CYCLE_LENGTH + year_cycle;
++
++    assert( year_cycle >= 0 );
++    assert( year_cycle < SOLAR_CYCLE_LENGTH );
++    safe_year = safe_years[year_cycle];
++
++    assert(safe_year <= 2037 && safe_year >= 2010);
++    
++    TRACE3("# year: %lld, year_cycle: %lld, safe_year: %d\n",
++          year, year_cycle, safe_year);
++
++    return safe_year;
++}
++
++
++void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
++    if( src == NULL ) {
++        memset(dest, 0, sizeof(*dest));
++    }
++    else {
++#       ifdef USE_TM64
++            dest->tm_sec        = src->tm_sec;
++            dest->tm_min        = src->tm_min;
++            dest->tm_hour       = src->tm_hour;
++            dest->tm_mday       = src->tm_mday;
++            dest->tm_mon        = src->tm_mon;
++            dest->tm_year       = (Year)src->tm_year;
++            dest->tm_wday       = src->tm_wday;
++            dest->tm_yday       = src->tm_yday;
++            dest->tm_isdst      = src->tm_isdst;
++
++#           ifdef HAS_TM_TM_GMTOFF
++                dest->tm_gmtoff  = src->tm_gmtoff;
++#           endif
++
++#           ifdef HAS_TM_TM_ZONE
++                dest->tm_zone  = src->tm_zone;
++#           endif
++
++#       else
++            /* They're the same type */
++            memcpy(dest, src, sizeof(*dest));
++#       endif
++    }
++}
++
++
++void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
++    if( src == NULL ) {
++        memset(dest, 0, sizeof(*dest));
++    }
++    else {
++#       ifdef USE_TM64
++            dest->tm_sec        = src->tm_sec;
++            dest->tm_min        = src->tm_min;
++            dest->tm_hour       = src->tm_hour;
++            dest->tm_mday       = src->tm_mday;
++            dest->tm_mon        = src->tm_mon;
++            dest->tm_year       = (int)src->tm_year;
++            dest->tm_wday       = src->tm_wday;
++            dest->tm_yday       = src->tm_yday;
++            dest->tm_isdst      = src->tm_isdst;
++
++#           ifdef HAS_TM_TM_GMTOFF
++                dest->tm_gmtoff  = src->tm_gmtoff;
++#           endif
++
++#           ifdef HAS_TM_TM_ZONE
++                dest->tm_zone  = src->tm_zone;
++#           endif
++
++#       else
++            /* They're the same type */
++            memcpy(dest, src, sizeof(*dest));
++#       endif
++    }
++}
++
++
++/* Simulate localtime_r() to the best of our ability */
++struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
++    const struct tm *static_result = localtime(clock);
++
++    assert(result != NULL);
++
++    if( static_result == NULL ) {
++        memset(result, 0, sizeof(*result));
++        return NULL;
++    }
++    else {
++        memcpy(result, static_result, sizeof(*result));
++        return result;
++    }
++}
++
++
++/* Simulate gmtime_r() to the best of our ability */
++struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
++    const struct tm *static_result = gmtime(clock);
++
++    assert(result != NULL);
++
++    if( static_result == NULL ) {
++        memset(result, 0, sizeof(*result));
++        return NULL;
++    }
++    else {
++        memcpy(result, static_result, sizeof(*result));
++        return result;
++    }
++}
++
++
++struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
++{
++    int v_tm_sec, v_tm_min, v_tm_hour, v_tm_mon, v_tm_wday;
++    Time64_T v_tm_tday;
++    int leap;
++    Time64_T m;
++    Time64_T time = *in_time;
++    Year year = 70;
++    int cycles = 0;
++
++    assert(p != NULL);
++
++    /* Use the system gmtime() if time_t is small enough */
++    if( SHOULD_USE_SYSTEM_GMTIME(*in_time) ) {
++        time_t safe_time = *in_time;
++        struct tm safe_date;
++        GMTIME_R(&safe_time, &safe_date);
++
++        copy_tm_to_TM(&safe_date, p);
++        assert(check_tm(p));
++
++        return p;
++    }
++
++#ifdef HAS_TM_TM_GMTOFF
++    p->tm_gmtoff = 0;
++#endif
++    p->tm_isdst  = 0;
++
++#ifdef HAS_TM_TM_ZONE
++    p->tm_zone   = "UTC";
++#endif
++
++    v_tm_sec =  (int)(time % 60);
++    time /= 60;
++    v_tm_min =  (int)(time % 60);
++    time /= 60;
++    v_tm_hour = (int)(time % 24);
++    time /= 24;
++    v_tm_tday = time;
++
++    WRAP (v_tm_sec, v_tm_min, 60);
++    WRAP (v_tm_min, v_tm_hour, 60);
++    WRAP (v_tm_hour, v_tm_tday, 24);
++
++    v_tm_wday = (int)((v_tm_tday + 4) % 7);
++    if (v_tm_wday < 0)
++        v_tm_wday += 7;
++    m = v_tm_tday;
++
++    if (m >= CHEAT_DAYS) {
++        year = CHEAT_YEARS;
++        m -= CHEAT_DAYS;
++    }
++
++    if (m >= 0) {
++        /* Gregorian cycles, this is huge optimization for distant times */
++        cycles = (int)(m / (Time64_T) days_in_gregorian_cycle);
++        if( cycles ) {
++            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
++            year += (cycles * years_in_gregorian_cycle);
++        }
++
++        /* Years */
++        leap = IS_LEAP (year);
++        while (m >= (Time64_T) length_of_year[leap]) {
++            m -= (Time64_T) length_of_year[leap];
++            year++;
++            leap = IS_LEAP (year);
++        }
++
++        /* Months */
++        v_tm_mon = 0;
++        while (m >= (Time64_T) days_in_month[leap][v_tm_mon]) {
++            m -= (Time64_T) days_in_month[leap][v_tm_mon];
++            v_tm_mon++;
++        }
++    } else {
++        year--;
++
++        /* Gregorian cycles */
++        cycles = (int)((m / (Time64_T) days_in_gregorian_cycle) + 1);
++        if( cycles ) {
++            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
++            year += (cycles * years_in_gregorian_cycle);
++        }
++
++        /* Years */
++        leap = IS_LEAP (year);
++        while (m < (Time64_T) -length_of_year[leap]) {
++            m += (Time64_T) length_of_year[leap];
++            year--;
++            leap = IS_LEAP (year);
++        }
++
++        /* Months */
++        v_tm_mon = 11;
++        while (m < (Time64_T) -days_in_month[leap][v_tm_mon]) {
++            m += (Time64_T) days_in_month[leap][v_tm_mon];
++            v_tm_mon--;
++        }
++        m += (Time64_T) days_in_month[leap][v_tm_mon];
++    }
++
++    p->tm_year = year;
++    if( p->tm_year != year ) {
++#ifdef EOVERFLOW
++        errno = EOVERFLOW;
++#endif
++        return NULL;
++    }
++
++    /* At this point m is less than a year so casting to an int is safe */
++    p->tm_mday = (int) m + 1;
++    p->tm_yday = julian_days_by_month[leap][v_tm_mon] + (int)m;
++    p->tm_sec  = v_tm_sec;
++    p->tm_min  = v_tm_min;
++    p->tm_hour = v_tm_hour;
++    p->tm_mon  = v_tm_mon;
++    p->tm_wday = v_tm_wday;
++    
++    assert(check_tm(p));
++
++    return p;
++}
++
++
++struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
++{
++    time_t safe_time;
++    struct tm safe_date;
++    struct TM gm_tm;
++    Year orig_year;
++    int month_diff;
++
++    assert(local_tm != NULL);
++
++    /* Use the system localtime() if time_t is small enough */
++    if( SHOULD_USE_SYSTEM_LOCALTIME(*time) ) {
++        safe_time = *time;
++
++        TRACE1("Using system localtime for %lld\n", *time);
++
++        LOCALTIME_R(&safe_time, &safe_date);
++
++        copy_tm_to_TM(&safe_date, local_tm);
++        assert(check_tm(local_tm));
++
++        return local_tm;
++    }
++
++    if( gmtime64_r(time, &gm_tm) == NULL ) {
++        TRACE1("gmtime64_r returned null for %lld\n", *time);
++        return NULL;
++    }
++
++    orig_year = gm_tm.tm_year;
++
++    if (gm_tm.tm_year > (2037 - 1900) ||
++        gm_tm.tm_year < (1970 - 1900)
++       )
++    {
++        TRACE1("Mapping tm_year %lld to safe_year\n", (Year)gm_tm.tm_year);
++        gm_tm.tm_year = safe_year((Year)(gm_tm.tm_year + 1900)) - 1900;
++    }
++
++    safe_time = timegm64(&gm_tm);
++    if( LOCALTIME_R(&safe_time, &safe_date) == NULL ) {
++        TRACE1("localtime_r(%d) returned NULL\n", (int)safe_time);
++        return NULL;
++    }
++
++    copy_tm_to_TM(&safe_date, local_tm);
++
++    local_tm->tm_year = orig_year;
++    if( local_tm->tm_year != orig_year ) {
++        TRACE2("tm_year overflow: tm_year %lld, orig_year %lld\n",
++              (Year)local_tm->tm_year, (Year)orig_year);
++
++#ifdef EOVERFLOW
++        errno = EOVERFLOW;
++#endif
++        return NULL;
++    }
++
++
++    month_diff = local_tm->tm_mon - gm_tm.tm_mon;
++
++    /*  When localtime is Dec 31st previous year and
++        gmtime is Jan 1st next year.
++    */
++    if( month_diff == 11 ) {
++        local_tm->tm_year--;
++    }
++
++    /*  When localtime is Jan 1st, next year and
++        gmtime is Dec 31st, previous year.
++    */
++    if( month_diff == -11 ) {
++        local_tm->tm_year++;
++    }
++
++    /* GMT is Jan 1st, xx01 year, but localtime is still Dec 31st 
++       in a non-leap xx00.  There is one point in the cycle
++       we can't account for which the safe xx00 year is a leap
++       year.  So we need to correct for Dec 31st comming out as
++       the 366th day of the year.
++    */
++    if( !IS_LEAP(local_tm->tm_year) && local_tm->tm_yday == 365 )
++        local_tm->tm_yday--;
++
++    assert(check_tm(local_tm));
++    
++    return local_tm;
++}
+diff --git a/time64.h b/time64.h
+new file mode 100644
+index 0000000..7e16a16
+--- /dev/null
++++ b/time64.h
+@@ -0,0 +1,62 @@
++#include <time.h>
++#include "time64_config.h"
++
++#ifndef TIME64_H
++#    define TIME64_H
++
++
++/* Set our custom types */
++typedef INT_64_T        Int64;
++typedef Int64           Time64_T;
++typedef Int64           Year;
++
++
++/* A copy of the tm struct but with a 64 bit year */
++struct TM64 {
++        int     tm_sec;
++        int     tm_min;
++        int     tm_hour;
++        int     tm_mday;
++        int     tm_mon;
++        Year    tm_year;
++        int     tm_wday;
++        int     tm_yday;
++        int     tm_isdst;
++
++#ifdef HAS_TM_TM_GMTOFF
++        long    tm_gmtoff;
++#endif
++
++#ifdef HAS_TM_TM_ZONE
++        char    *tm_zone;
++#endif
++};
++
++
++/* Decide which tm struct to use */
++#ifdef USE_TM64
++#define TM      TM64
++#else
++#define TM      tm
++#endif   
++
++
++/* Declare public functions */
++struct TM *gmtime64_r    (const Time64_T *, struct TM *);
++struct TM *localtime64_r (const Time64_T *, struct TM *);
++Time64_T   timegm64      (struct TM *);
++
++
++/* Not everyone has gm/localtime_r(), provide a replacement */
++#ifdef HAS_LOCALTIME_R
++#    define LOCALTIME_R(clock, result) localtime_r(clock, result)
++#else
++#    define LOCALTIME_R(clock, result) fake_localtime_r(clock, result)
++#endif
++#ifdef HAS_GMTIME_R
++#    define GMTIME_R(clock, result)    gmtime_r(clock, result)
++#else
++#    define GMTIME_R(clock, result)    fake_gmtime_r(clock, result)
++#endif
++
++#endif
+diff --git a/time64_config.h b/time64_config.h
+new file mode 100644
+index 0000000..bc3818c
+--- /dev/null
++++ b/time64_config.h
+@@ -0,0 +1,82 @@
++#ifndef TIME64_CONFIG_H
++#    define TIME64_CONFIG_H
++
++/* Configuration
++   -------------
++   Define as appropriate for your system.
++   Sensible defaults provided.
++*/
++
++/* Debugging
++   TIME_64_DEBUG
++   Define if you want debugging messages
++*/
++/* #define TIME_64_DEBUG */
++
++
++/* INT_64_T
++   A 64 bit integer type to use to store time and others.
++   Must be defined.
++*/
++#define INT_64_T                Quad_t
++
++
++/* USE_TM64
++   Should we use a 64 bit safe replacement for tm?  This will
++   let you go past year 2 billion but the struct will be incompatible
++   with tm.  Conversion functions will be provided.
++*/
++#define USE_TM64
++
++
++/* Availability of system functions.
++
++   HAS_GMTIME_R
++   Define if your system has gmtime_r()
++
++   HAS_LOCALTIME_R
++   Define if your system has localtime_r()
++
++   HAS_TIMEGM
++   Define if your system has timegm(), a GNU extension.
++*/
++/* Set in config.h */
++
++
++/* Details of non-standard tm struct elements.
++
++   HAS_TM_TM_GMTOFF
++   True if your tm struct has a "tm_gmtoff" element.
++   A BSD extension.
++
++   HAS_TM_TM_ZONE
++   True if your tm struct has a "tm_zone" element.
++   A BSD extension.
++*/
++/* Set in config.h */
++
++
++/* USE_SYSTEM_LOCALTIME
++   USE_SYSTEM_GMTIME
++   Should we use the system functions if the time is inside their range?
++   Your system localtime() is probably more accurate, but our gmtime() is
++   fast and safe.
++*/
++#define USE_SYSTEM_LOCALTIME
++/* #define USE_SYSTEM_GMTIME */
++
++
++/* SYSTEM_LOCALTIME_MAX
++   SYSTEM_LOCALTIME_MIN
++   SYSTEM_GMTIME_MAX
++   SYSTEM_GMTIME_MIN
++   Maximum and minimum values your system's gmtime() and localtime()
++   can handle.  We will use your system functions if the time falls
++   inside these ranges.
++*/
++#define SYSTEM_LOCALTIME_MAX    LOCALTIME_MAX
++#define SYSTEM_LOCALTIME_MIN    LOCALTIME_MIN
++#define SYSTEM_GMTIME_MAX       GMTIME_MAX
++#define SYSTEM_GMTIME_MIN       GMTIME_MIN
++
++#endif /* TIME64_CONFIG_H */
+diff --git a/win32/config.bc b/win32/config.bc
+index 4e7cd11..5d6dcd8 100644
+--- a/win32/config.bc
++++ b/win32/config.bc
+@@ -351,7 +351,7 @@ d_pwgecos='undef'
+ d_pwpasswd='undef'
+ d_pwquota='undef'
+ d_qgcvt='undef'
+-d_quad='undef'
++d_quad='define'
+ d_random_r='undef'
+ d_readdir64_r='undef'
+ d_readdir='define'
+diff --git a/win32/config.gc b/win32/config.gc
+index 79f4d8e..f14d0b5 100644
+--- a/win32/config.gc
++++ b/win32/config.gc
+@@ -351,7 +351,7 @@ d_pwgecos='undef'
+ d_pwpasswd='undef'
+ d_pwquota='undef'
+ d_qgcvt='undef'
+-d_quad='undef'
++d_quad='define'
+ d_random_r='undef'
+ d_readdir64_r='undef'
+ d_readdir='define'
+@@ -851,7 +851,7 @@ privlibexp='~INST_TOP~~INST_VER~\lib'
+ procselfexe=''
+ prototype='define'
+ ptrsize='4'
+-quadkind='5'
++quadkind='3'
+ quadtype='long long'
+ randbits='15'
+ randfunc='rand'
+diff --git a/win32/config.vc b/win32/config.vc
+index 6613b45..b273c5a 100644
+--- a/win32/config.vc
++++ b/win32/config.vc
+@@ -351,7 +351,7 @@ d_pwgecos='undef'
+ d_pwpasswd='undef'
+ d_pwquota='undef'
+ d_qgcvt='undef'
+-d_quad='undef'
++d_quad='define'
+ d_random_r='undef'
+ d_readdir64_r='undef'
+ d_readdir='define'
+diff --git a/win32/config.vc64 b/win32/config.vc64
+index 02b5ac9..e8c3f11 100644
+--- a/win32/config.vc64
++++ b/win32/config.vc64
+@@ -851,7 +851,7 @@ privlibexp='~INST_TOP~~INST_VER~\lib'
+ procselfexe=''
+ prototype='define'
+ ptrsize='8'
+-quadkind='4'
++quadkind='5'
+ quadtype='__int64'
+ randbits='15'
+ randfunc='rand'
+diff --git a/win32/config_H.bc b/win32/config_H.bc
+index 9e15ff3..c47f414 100644
+--- a/win32/config_H.bc
++++ b/win32/config_H.bc
+@@ -909,9 +909,10 @@
+ /* HAS_QUAD:
+  *	This symbol, if defined, tells that there's a 64-bit integer type,
+  *	Quad_t, and its unsigned counterpar, Uquad_t. QUADKIND will be one
+- *	of QUAD_IS_INT, QUAD_IS_LONG, QUAD_IS_LONG_LONG, or QUAD_IS_INT64_T.
++ *	of QUAD_IS_INT, QUAD_IS_LONG, QUAD_IS_LONG_LONG, QUAD_IS_INT64_T,
++ *	or QUAD_IS___INT64.
+  */
+-/*#define HAS_QUAD	/**/
++#define HAS_QUAD	/**/
+ #ifdef HAS_QUAD
+ #   define Quad_t __int64	/**/
+ #   define Uquad_t unsigned __int64	/**/
+@@ -920,6 +921,7 @@
+ #   define QUAD_IS_LONG	2
+ #   define QUAD_IS_LONG_LONG	3
+ #   define QUAD_IS_INT64_T	4
++#   define QUAD_IS___INT64	5
+ #endif
+ 
+ /* OSNAME:
+diff --git a/win32/config_H.gc b/win32/config_H.gc
+index df197cb..6cd5538 100644
+--- a/win32/config_H.gc
++++ b/win32/config_H.gc
+@@ -909,22 +909,25 @@
+ /* HAS_QUAD:
+  *	This symbol, if defined, tells that there's a 64-bit integer type,
+  *	Quad_t, and its unsigned counterpar, Uquad_t. QUADKIND will be one
+- *	of QUAD_IS_INT, QUAD_IS_LONG, QUAD_IS_LONG_LONG, or QUAD_IS_INT64_T.
++ *	of QUAD_IS_INT, QUAD_IS_LONG, QUAD_IS_LONG_LONG, QUAD_IS_INT64_T,
++ *	or QUAD_IS___INT64.
+  */
+-/*#define HAS_QUAD	/**/
++#define HAS_QUAD	/**/
+ #ifdef HAS_QUAD
+ #   ifndef _MSC_VER
+ #	define Quad_t long long	/**/
+ #	define Uquad_t unsigned long long	/**/
++#	define QUADKIND 3	/**/
+ #   else
+ #	define Quad_t __int64	/**/
+ #	define Uquad_t unsigned __int64	/**/
++#	define QUADKIND 5	/**/
+ #   endif
+-#   define QUADKIND 5	/**/
+ #   define QUAD_IS_INT	1
+ #   define QUAD_IS_LONG	2
+ #   define QUAD_IS_LONG_LONG	3
+ #   define QUAD_IS_INT64_T	4
++#   define QUAD_IS___INT64	5
+ #endif
+ 
+ /* OSNAME:
+diff --git a/win32/config_H.vc b/win32/config_H.vc
+index 53ef9e6..e43dcaf 100644
+--- a/win32/config_H.vc
++++ b/win32/config_H.vc
+@@ -909,22 +909,25 @@
+ /* HAS_QUAD:
+  *	This symbol, if defined, tells that there's a 64-bit integer type,
+  *	Quad_t, and its unsigned counterpar, Uquad_t. QUADKIND will be one
+- *	of QUAD_IS_INT, QUAD_IS_LONG, QUAD_IS_LONG_LONG, or QUAD_IS_INT64_T.
++ *	of QUAD_IS_INT, QUAD_IS_LONG, QUAD_IS_LONG_LONG, QUAD_IS_INT64_T.
++ *	or QUAD_IS___INT64.
+  */
+-/*#define HAS_QUAD	/**/
++#define HAS_QUAD	/**/
+ #ifdef HAS_QUAD
+ #   ifndef __GNUC__
+ #	define Quad_t __int64	/**/
+ #	define Uquad_t unsigned __int64	/**/
++#	define QUADKIND 5	/**/
+ #   else
+ #	define Quad_t long long	/**/
+ #	define Uquad_t unsigned long long	/**/
++#	define QUADKIND 3	/**/
+ #   endif
+-#   define QUADKIND 5	/**/
+ #   define QUAD_IS_INT	1
+ #   define QUAD_IS_LONG	2
+ #   define QUAD_IS_LONG_LONG	3
+ #   define QUAD_IS_INT64_T	4
++#   define QUAD_IS___INT64	5
+ #endif
+ 
+ /* OSNAME:
+diff --git a/win32/config_H.vc64 b/win32/config_H.vc64
+index 699efc2..ac0f79e 100644
+--- a/win32/config_H.vc64
++++ b/win32/config_H.vc64
+@@ -909,17 +909,19 @@
+ /* HAS_QUAD:
+  *	This symbol, if defined, tells that there's a 64-bit integer type,
+  *	Quad_t, and its unsigned counterpar, Uquad_t. QUADKIND will be one
+- *	of QUAD_IS_INT, QUAD_IS_LONG, QUAD_IS_LONG_LONG, or QUAD_IS_INT64_T.
++ *	of QUAD_IS_INT, QUAD_IS_LONG, QUAD_IS_LONG_LONG, QUAD_IS_INT64_T
++ *	or QUAD_IS___INT64.
+  */
+ #define HAS_QUAD	/**/
+ #ifdef HAS_QUAD
+ #   define Quad_t __int64	/**/
+ #   define Uquad_t unsigned __int64	/**/
+-#   define QUADKIND 4	/**/
++#   define QUADKIND 5	/**/
+ #   define QUAD_IS_INT	1
+ #   define QUAD_IS_LONG	2
+ #   define QUAD_IS_LONG_LONG	3
+ #   define QUAD_IS_INT64_T	4
++#   define QUAD_IS___INT64	5
+ #endif
+ 
+ /* OSNAME:
