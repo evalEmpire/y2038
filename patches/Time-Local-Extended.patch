@@ -1,0 +1,4856 @@
+diff --git a/Changes b/Changes
+index 55cfde8..fd90c0c 100644
+--- a/Changes
++++ b/Changes
+@@ -1,5 +1,15 @@
+ Revision history for Perl extension Time::Local::Extended.
+ 
++Next
++     New Features
++     * Now accurate beyond 2090 and before 1900.
++
++     Bug Fixes
++     * localtime() and timelocal() are now more accurate about DST changes.
++
++     Misc
++     * Now using the y2038 project
++
+ 0.48  Mon Jun 28 22:30:00 2004 EDT
+ 
+      - Fixed skip() in tests to agree with number of planned tests.
+diff --git a/Extended.pm b/Extended.pm
+deleted file mode 100755
+index 10ea33c..0000000
+--- a/Extended.pm
++++ /dev/null
+@@ -1,410 +0,0 @@
+-# Time::Local::Extended -- Extends 2038 barrier to 2098.
+-# 
+-# Copyright (C) 2003-2004  Bob O'Neill.
+-# All rights reserved.
+-#
+-# This program is free software; you can redistribute it and/or
+-# modify it under the terms of the GNU General Public License
+-# as published by the Free Software Foundation; either version 2
+-# of the License, or (at your option) any later version.
+-#
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-#
+-
+-package Time::Local::Extended;
+-
+-use strict;
+-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
+-use Exporter;
+-use Carp qw(cluck);
+-use Time::Local qw();
+-
+-@ISA         = qw(Exporter);
+-@EXPORT      = qw(timelocal localtime timegm gmtime);
+-@EXPORT_OK   = qw(timelocal localtime timegm gmtime
+-                  UNIX_TIMESTAMP FROM_UNIXTIME);
+-%EXPORT_TAGS = (ALL => [qw(timelocal localtime timegm gmtime
+-                UNIX_TIMESTAMP FROM_UNIXTIME)] );
+-$VERSION     = '0.48';
+-local $^W    = 1;
+-
+-sub timelocal
+-{
+-    my @time_data = @_;
+-
+-    # Follow the Time::Local::timelocal conventions:
+-    #
+-    # 1) Treat years greater than 999 as the actual 4-digit year
+-    #    (not an offset from 1900)
+-    # 2) Treat years in the range 0..99 as years in the "current century"
+-    #
+-    my $year  = $time_data[5];
+-    $time_data[5] -= 1900 if $year > 999;
+-
+-    if ($year >= 0 and $year <= 99)
+-    {
+-        my $current_year    = (CORE::localtime())[5] + 1900;
+-        my $current_century = int ($current_year / 100) * 100;
+- 
+-        my $break_point = $current_year + 50;
+-           $current_century += 100 if ($break_point % 100) < 50;
+-
+-        my $adjusted_year  = $current_century + $year;
+-           $adjusted_year -= 100 if ($year + $current_century) > $break_point;
+-
+-        $time_data[5] = $adjusted_year - 1900;
+-    }
+-
+-    my $can_adjust = ($time_data[5] >= 198) ? 0 : 1;
+-    if (not $can_adjust)
+-    {
+-        # Just give it to timelocal as-is (not what you want, but better than
+-        # dying -- although in the most recent versions of Time::Local, it
+-        # croaks anyway).
+-        cluck qq|INVALID TIME ARRAY (|
+-                .join(',',@time_data)
+-                .qq|).  Giving it straight to |
+-                .qq| Time::Local::timelocal() and returning|;
+-
+-        return Time::Local::timelocal(@time_data);
+-    }
+-
+-    # Need to adjust if year is 2038 or greater, even in January, because
+-    # Time::Local::timelocal() breaks at Jan 1 2038 rather than Jan 18, 2038.
+-    my $adjusting = ($time_data[5] >= 138) ? 1 : 0;
+-
+-    # 1) Subtract 60 years
+-    my $num_years = 60;
+-    my @adjusted_time = @time_data;
+-    if ($adjusting)
+-    {
+-        $adjusted_time[5] -= $num_years;
+-
+-        # No need to adjust weekday here, because timelocal()
+-        # doesn't need weekday in order to compute the number of
+-        # epoch seconds.
+-    }
+-
+-    # 2) Invoke classic timelocal
+-    my $timelocal = Time::Local::timelocal(@adjusted_time);
+-
+-    # 3) Add 60 years worth of seconds
+-    #   (this is leap-year friendly since we're doing manipulations mid-century)
+-    my $num_seconds = 86400 * (($num_years/4) * 366 + ($num_years * 3/4) * 365);
+-    if ($adjusting)
+-    {
+-        $timelocal += $num_seconds;
+-    }
+-
+-    return $timelocal;
+-}
+-
+-sub localtime
+-{
+-    my $time_in_seconds = shift;
+-       $time_in_seconds = time if not defined $time_in_seconds;
+-
+-    # 1) Subtract 60 years worth of seconds from time_in_seconds
+-    #   (this is leap-year friendly since we're doing manipulations mid-century)
+-    my $num_years   = 60;
+-    my $num_seconds = 86400 * (($num_years/4) * 366 + ($num_years * 3/4) * 365);
+-    my $can_adjust  = ($time_in_seconds >= 2**31 + $num_seconds) ? 0 : 1;
+-    if (not $can_adjust)
+-    {
+-        # Just give it to localtime as-is (not what you want, but better than
+-        # dying).
+-        cluck qq|INVALID TIME '$time_in_seconds'.  |
+-                .qq|Giving it straight to CORE::localtime() and returning|;
+-        return wantarray ? CORE::localtime($time_in_seconds)
+-                         : scalar CORE::localtime $time_in_seconds;
+-    }
+-    my $adjusting      = ($time_in_seconds >= 2**31) ? 1 : 0;
+-    my $adjusted_time  =  $time_in_seconds;
+-       $adjusted_time -=  $num_seconds if $adjusting;
+-
+-    # 2) Invoke classic localtime
+-    #   (Handle both list and scalar contexts.)
+-    my @localtime = localtime($adjusted_time);
+-    my $localtime = scalar localtime($adjusted_time);
+-
+-    # 3) Add 60 years to localtime return values
+-    if (wantarray)
+-    {
+-        if ($adjusting)
+-        {
+-            $localtime[5] += $num_years;
+-
+-            # Need to adjust weekday also.
+-            my $weekday_adjust = ($num_years + $num_years / 4) % 7;
+-            my $weekday        = $localtime[6];
+-            my $new_weekday    = $weekday + $weekday_adjust;
+-               $new_weekday   -= 7 if $new_weekday > 6;
+-            $localtime[6]      = $new_weekday;
+-        }
+-        return @localtime;
+-    }
+-    else
+-    {
+-        if ($adjusting)
+-        {
+-            # Increment year.
+-            $localtime =~ s/(\d{4})$/$1+$num_years/e;
+-
+-            # Compute new weekday.
+-            my @weekdays = qw(Sun Mon Tue Wed Thu Fri Sat);
+-            my %weekdays = (Sun => 0, Mon => 1, Tue => 2, Wed => 3,
+-                            Thu => 4, Fri => 5, Sat => 6);
+-            my $weekday_word     = substr $localtime, 0, 3;
+-            my $weekday          = $weekdays{$weekday_word};
+-            my $weekday_adjust   = ($num_years + $num_years / 4) % 7;
+-            my $new_weekday      = $weekday + $weekday_adjust;
+-               $new_weekday     -= 7 if $new_weekday > 6;
+-            my $new_weekday_word = $weekdays[$new_weekday];
+-
+-            # Adjust weekday.
+-            $localtime =~ s/^(\w{3})/$new_weekday_word/;
+-        }
+-        return $localtime;
+-    }
+-}
+-
+-sub timegm
+-{
+-    my $timelocal = &timelocal(@_);
+-    my $timegm    = $timelocal + &diff_to_gmt(@_);
+-    return $timegm;
+-}
+-
+-sub gmtime
+-{
+-    my $gmtime    = shift;
+-    my $localtime = $gmtime - &diff_to_gmt(&localtime($gmtime));
+-    return &localtime($localtime)
+-}
+-
+-sub UNIX_TIMESTAMP
+-{
+-    my $date_time = shift;
+-    my $unix_timestamp;
+-
+-    my $year;
+-    my $month;
+-    my $day;
+-    my $hour;
+-    my $min;
+-    my $sec;
+-    if ($date_time =~ /^0000-?00-?00( ?00:?00:?00)?$/)
+-    {
+-            return '';
+-    }
+-    elsif ($date_time =~ /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}):(\d{2}))?$/)
+-    {
+-        # DATE or DATETIME
+-        # "YYYY-MM-DD" or "YYYY-MM-DD hh:mm:ss"
+-        $year  = $1;
+-        $month = $2;
+-        $day   = $3;
+-        $hour  = $4 || '00';
+-        $min   = $5 || '00';
+-        $sec   = $6 || '00';
+-    }
+-    elsif ($date_time =~ /^(\d{4}|\d{2})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2}))?$/)
+-    {
+-        # DATE or DATETIME
+-        # "YYYYMMDD" or "YYMMDD" or "YYYYMMDDhhmmss" or "YYMMDDhhmmss"
+-        $year  = $1;
+-        $month = $2;
+-        $day   = $3;
+-        $hour  = $4 || '00';
+-        $min   = $5 || '00';
+-        $sec   = $6 || '00';
+-
+-        if ($year =~ /^\d{2}$/)
+-        {
+-            if ($year >= 0 and $year < 38)
+-            {
+-                    $year += 2000;
+-            }
+-            else
+-            {
+-                    $year += 1900;
+-            }
+-            warn "Year $year is likely to break something" if $year < 1970;
+-        }
+-    }
+-    else
+-    {
+-        cluck "Invalid DATE_TIME '$date_time'";
+-        return 0; # Epoch
+-    }
+-
+-    my $m = $month - 1;
+-    my $y = $year  - 1900;
+-    my @localtime = ($sec, $min, $hour, $day, $m, $y);
+-
+-    $unix_timestamp = &timelocal(@localtime);
+-
+-    return $unix_timestamp;
+-}
+-
+-sub FROM_UNIXTIME
+-{
+-    my $unix_timestamp = shift;
+-
+-    if ($unix_timestamp eq '') ### want to warn if undef
+-    {
+-        return '0000-00-00 00:00:00';
+-    }
+-    elsif ($unix_timestamp !~ /^\d+$/)
+-    {
+-        cluck "Invalid DATE_TIME '$unix_timestamp'";
+-        return '0000-00-00 00:00:00';
+-    }
+-
+-    my @localtime = &localtime($unix_timestamp);
+-
+-    my $year  = $localtime[5] + 1900;
+-    my $month = $localtime[4] + 1;
+-    my $day   = $localtime[3];
+-    my $hour  = $localtime[2];
+-    my $min   = $localtime[1];
+-    my $sec   = $localtime[0];
+-
+-    my $date_time = sprintf "%04d-%02d-%02d %02d:%02d:%02d", $year, $month, $day, $hour, $min, $sec;
+-
+-    return $date_time;
+-}
+-
+-sub diff_to_gmt
+-{
+-    # Adjust year if necessary.
+-    my @t = @_;
+-    $t[5] -= 60 until $t[5] < 138;
+-
+-    my $localtime = Time::Local::timelocal(@t);
+-    my $gmtime    = Time::Local::timegm(@t);
+-    my $gmt_diff  = ($gmtime - $localtime);
+-
+-    return $gmt_diff;
+-}
+-
+-1; # of rings to rule them all.
+-
+-__END__
+-
+-=head1 NAME
+-
+-Time::Local::Extended - Extends 2038 barrier to 2098.
+-
+-=head1 SYNOPSIS
+-
+-  use Time::Local::Extended qw(:ALL);
+-
+-  my @localtime   = localtime(2**31);
+-  my $seconds     = timelocal(0,0,0,1,10,170);
+-  my $gmt_seconds = timegm(0,0,0,1,10,170);
+-  my $gmt_time    = gmtime(2**31);
+-  my $ux_time     = UNIX_TIMESTAMP('2097-07-04 12:34:56');
+-  my $date        = FROM_UNIXTIME(2**31);
+-
+-  my $sql = qq(
+-         SELECT start_time
+-         FROM   projects
+-         WHERE  project_id = '1'
+-  );
+-  my $date_time = $dbh->selectrow_array($sql); # '2097-07-04 12:34:56'
+-  my $ux_time   = UNIX_TIMESTAMP($date_time);  # 4023794096
+-
+-  my $date_time = FROM_UNIXTIME(2**31);
+-  my $sql  = qq(
+-         UPDATE projects
+-         SET    start_time = '$date_time'
+-         WHERE  project_id = '1'
+-  );
+-
+-=head1 DESCRIPTION
+-
+-This module extends the 2038 date boundary to 2098.  In conventional
+-date manipulation using CORE::localtime and Time::Local::timelocal,
+-you cannot use dates later than 2038.  This module allows you
+-to use dates as far out as 2098, giving you sixty more years to
+-postpone the problem.
+-
+-=head1 PUBLIC METHODS
+-
+-=over 4
+-
+-=item * B<timelocal>
+-
+-Invoked in the same way as Time::Local::timelocal, but supports
+-dates up to Jan 1, 2098.
+-
+-=item * B<localtime>
+-
+-Invoked in the same way as CORE::localtime, but supports
+-dates up to Jan 18, 2098.
+-
+-=item * B<timegm>
+-
+-Invoked in the same way as Time::Local::timegm, but supports
+-dates up to Jan 1, 2098.
+-
+-=item * B<gmtime>
+-
+-Invoked in the same way as CORE::gmtime, but supports
+-dates up to Jan 18, 2098.
+-
+-=item * B<UNIX_TIMESTAMP>
+-
+-Invoked similarly to the MySQL UNIX_TIMESTAMP() function, but supports
+-dates up to Jan 1, 2098.
+-
+-=item * B<FROM_UNIXTIME>
+-
+-Invoked similarly to the MySQL FROM_UNIXTIME() function, but supports
+-dates up to Jan 18, 2098.
+-
+-=back
+-
+-=head1 BUGS
+-
+-Please e-mail bug reports or suggestions to bobo@cpan.org.  Thanks!
+-
+-=head1 TODO
+-
+-  1) Trap Time::Local::timelocal die in an eval {}.
+-  2) Add support for timelocal_nocheck and timegm_nocheck.
+-  3) Add tests for time zones other than Eastern.
+-  4) Clean up.  Lots of clean up.
+-
+-=head1 CREDITS
+-
+-Thanks to Peter Kioko <ceph@techie.com> for helping to refine the idea.
+-Thanks to Adam Foxson <afoxson@pobox.com> for quality assurance and
+-for being the Human CPAN Reference Manual.
+-
+-=head1 AUTHOR
+-
+-Bob O'Neill, E<lt>bobo@cpan.orgE<gt>
+- 
+-=head1 COPYRIGHT AND LICENSE
+-
+-Copyright (C) 2003-2004 Bob O'Neill.
+-All rights reserved.
+-
+-See COPYING for license
+-
+-=head1 SEE ALSO
+-
+-=over 4
+-
+-=item * L<perl>.
+-
+-=item * L<Time::Local>.
+-
+-=back
+-
+-=cut
+diff --git a/Extended.xs b/Extended.xs
+new file mode 100644
+index 0000000..a56b4af
+--- /dev/null
++++ b/Extended.xs
+@@ -0,0 +1,91 @@
++#include "EXTERN.h"
++#include "perl.h"
++#include "XSUB.h"
++#include "time64.h"
++
++#define myPUSHi(int)   (PUSHs(sv_2mortal(newSViv(int))));
++#define myPUSHn(num)   (PUSHs(sv_2mortal(newSVnv(num))));
++
++MODULE = Time::Local::Extended          PACKAGE = Time::Local::Extended
++PROTOTYPES: DISABLE
++
++void
++localtime64(time)
++    const Time64_T time
++    INIT:
++        struct TM *err;
++        struct TM date;
++    PPCODE:
++        err = localtime64_r(&time, &date);
++
++        if( err == NULL )
++            XSRETURN_EMPTY;
++
++        EXTEND(SP, 9);
++        myPUSHi(date.tm_sec);
++	myPUSHi(date.tm_min);
++	myPUSHi(date.tm_hour);
++	myPUSHi(date.tm_mday);
++	myPUSHi(date.tm_mon);
++	myPUSHn(date.tm_year);
++	myPUSHi(date.tm_wday);
++	myPUSHi(date.tm_yday);
++	myPUSHi(date.tm_isdst);
++
++
++void
++gmtime64(time)
++    const Time64_T time
++    INIT:
++        struct TM *err;
++        struct TM date;
++    PPCODE:
++        err = gmtime64_r(&time, &date);
++
++        if( err == NULL )
++            XSRETURN_EMPTY;
++
++        EXTEND(SP, 9);
++        myPUSHi(date.tm_sec);
++	myPUSHi(date.tm_min);
++	myPUSHi(date.tm_hour);
++	myPUSHi(date.tm_mday);
++	myPUSHi(date.tm_mon);
++	myPUSHn(date.tm_year);
++	myPUSHi(date.tm_wday);
++	myPUSHi(date.tm_yday);
++	myPUSHi(date.tm_isdst);
++
++
++int
++safe_year(year)
++    const Year year
++    CODE:
++        RETVAL = safe_year(year);
++    OUTPUT:
++        RETVAL
++
++
++Time64_T
++timegm64(sec, min, hour, mday, mon, year)
++    const int sec
++    const int min
++    const int hour
++    const int mday
++    const int mon
++    const Year year
++
++    INIT:
++        struct TM date;
++        Time64_T time;
++    CODE:
++        date.tm_sec  = sec;
++        date.tm_min  = min;
++        date.tm_hour = hour;
++        date.tm_mday = mday;
++        date.tm_mon  = mon;
++        date.tm_year = year;
++
++        RETVAL = timegm64(&date);
++    OUTPUT:
++        RETVAL
+diff --git a/MANIFEST b/MANIFEST
+index 41797c9..d0658cc 100644
+--- a/MANIFEST
++++ b/MANIFEST
+@@ -1,11 +1,22 @@
+-COPYING
++bin/example.pl
+ Changes
+-Extended.pm
++COPYING
++Extended.xs
+ INSTALL
++lib/Time/Local/Extended.pm
++Makefile.PL
+ MANIFEST
+ MANIFEST.SKIP
+-Makefile.PL
++munge_config
++ppport.h
+ README
+-bin/example.pl
+ t/export_tests.t
+ t/function_tests.t
++t/is_leap.t
++t/munge_year.t
++t/round_trip.t
++t/seconds_between.t
++time64.c
++time64.h
++time64_config.h.in
++typemap
+diff --git a/MANIFEST.SKIP b/MANIFEST.SKIP
+index 5c9b7d0..8271ffd 100644
+--- a/MANIFEST.SKIP
++++ b/MANIFEST.SKIP
+@@ -1,7 +1,44 @@
+-^MANIFEST\.bak$
+-^Makefile$
+-^Makefile\.old$
+-^blib/
+-^pm_to_blib$
+-\.tar\.gz$
++
++#!start included /usr/local/perl/5.8.8/lib/ExtUtils/MANIFEST.SKIP
++# Avoid version control files.
++\bRCS\b
+ \bCVS\b
++\bSCCS\b
++,v$
++\B\.svn\b
++\B\.git\b
++\b_darcs\b
++
++# Avoid Makemaker generated and utility files.
++\bMANIFEST\.bak
++\bMakefile$
++\bblib/
++\bMakeMaker-\d
++\bpm_to_blib\.ts$
++\bpm_to_blib$
++\bblibdirs\.ts$         # 6.18 through 6.25 generated this
++
++# Avoid Module::Build generated and utility files.
++\bBuild$
++\b_build/
++
++# Avoid temp and backup files.
++~$
++\.old$
++\#$
++\b\.#
++\.bak$
++
++# Avoid Devel::Cover files.
++\bcover_db\b
++#!end included /usr/local/perl/5.8.8/lib/ExtUtils/MANIFEST.SKIP
++
++
++# This is generated
++^time64_config.h$
++
++
++# MakeMaker compile stuff
++\.bs$
++Extended.c
++\.o$
+diff --git a/Makefile.PL b/Makefile.PL
+index 7610a5f..4d78658 100644
+--- a/Makefile.PL
++++ b/Makefile.PL
+@@ -1,16 +1,29 @@
+ use ExtUtils::MakeMaker;
++use Config;
++
++# To be portable.
++my $objext = $Config{obj_ext};
++
++die "\$Config{quadtype} must be defined for this module to work."
++  unless $Config{quadtype};
+ 
+ WriteMakefile
+ (
+     'NAME'         => 'Time::Local::Extended',
+-    'VERSION_FROM' => 'Extended.pm',
++    'VERSION_FROM' => 'lib/Time/Local/Extended.pm',
+     'PREREQ_PM'    => {
+         'Time::Local' => 0,
+     },
++    OBJECT => "time64$objext Extended$objext",
++
++    PL_FILES => {
++        "munge_config" => "time64_config.h"
++    },
++
+     (
+         $] >= 5.005 ?
+         (
+-            ABSTRACT_FROM => 'Extended.pm',
++            ABSTRACT_FROM => 'lib/Time/Local/Extended.pm',
+             AUTHOR        => 'Bob O\'Neill <bobo@cpan.org>',
+         ) : ()
+     ),
+diff --git a/lib/Time/Local/Extended.pm b/lib/Time/Local/Extended.pm
+new file mode 100755
+index 0000000..d92510b
+--- /dev/null
++++ b/lib/Time/Local/Extended.pm
+@@ -0,0 +1,375 @@
++# Time::Local::Extended -- Extends 2038 barrier to 2098.
++# 
++# Copyright (C) 2003-2004  Bob O'Neill.
++# All rights reserved.
++#
++# This program is free software; you can redistribute it and/or
++# modify it under the terms of the GNU General Public License
++# as published by the Free Software Foundation; either version 2
++# of the License, or (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++
++package Time::Local::Extended;
++
++use strict;
++use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS);
++use Exporter;
++use DynaLoader;
++use Carp qw(cluck);
++use Time::Local qw();
++
++@ISA         = qw(Exporter DynaLoader);
++@EXPORT      = qw(timelocal localtime timegm gmtime);
++@EXPORT_OK   = qw(UNIX_TIMESTAMP FROM_UNIXTIME);
++%EXPORT_TAGS = (ALL => [@EXPORT, @EXPORT_OK]);
++$VERSION     = '0.48';
++local $^W    = 1;
++
++bootstrap Time::Local::Extended $VERSION;
++
++
++# Follow the Time::Local::timelocal conventions:
++#
++# 1) Treat years greater than 999 as the actual 4-digit year
++#    (not an offset from 1900)
++# 2) Treat years in the range 0..99 as years in the "current century"
++sub munge_year {
++    my $year  = shift;
++
++    return $year - 1900 if $year > 999 or $year < 0;
++
++    if ($year >= 0 and $year <= 99)
++    {
++        my $current_year    = (CORE::localtime())[5] + 1900;
++        my $current_century = int ($current_year / 100) * 100;
++ 
++        my $break_point = $current_year + 50;
++           $current_century += 100 if ($break_point % 100) < 50;
++
++        my $adjusted_year  = $current_century + $year;
++           $adjusted_year -= 100 if ($year + $current_century) > $break_point;
++
++        return $adjusted_year - 1900;
++    }
++
++    return $year;
++}
++
++sub timelocal
++{
++    my @time_data = @_;
++
++    $time_data[5] = munge_year($time_data[5]);
++
++    # Need to adjust if year is 2038 or greater, even in January, because
++    # Time::Local::timelocal() breaks at Jan 1 2038 rather than Jan 18, 2038.
++    # Also if the year is at or before 1970 because negative times often don't
++    # work.
++    my $adjusting = ($time_data[5] >= 138 or $time_data[5] <= 70) ? 1 : 0;
++    my $num_years = 0;
++
++    my $orig_year;
++    my $safe_year;
++    my @adjusted_time = @time_data;
++    if ($adjusting)
++    {
++        $orig_year = $time_data[5] + 1900;
++        $safe_year = safe_year($orig_year);
++        $num_years = $orig_year - $safe_year;
++        $adjusted_time[5] = $safe_year;
++
++        # No need to adjust weekday here, because timelocal()
++        # doesn't need weekday in order to compute the number of
++        # epoch seconds.
++    }
++
++    # 2) Invoke classic timelocal
++    my $timelocal = Time::Local::timelocal(@adjusted_time);
++
++    # 3) Add enough seconds to get back
++    if( $adjusting ) {
++        $timelocal += seconds_between($orig_year, $safe_year);
++    }
++
++    return $timelocal;
++}
++
++
++my $days_in_cycle = (365 * 400) + 100 - 4 + 1;
++sub seconds_between {
++    my($orig, $safe) = @_;
++
++    my $increment = ( $orig > $safe ) ? 1 : -1;
++    my $seconds = 0;
++
++    if( $orig > 2400 ) {
++        my $cycles = int(($orig - 2400) / 400);
++        $orig -= $cycles * 400;
++        $seconds += $cycles * $days_in_cycle * 60 * 60 * 24;
++    }
++
++    until( $safe == $orig ) {
++        my $days = is_leap($safe) ? 366 : 365;
++        $seconds += $days * 60 * 60 * 24;
++        $safe += $increment;
++    }
++
++    return $seconds * $increment;
++}
++
++
++sub is_leap {
++    my $year = shift;
++    return 1 if $year % 400 == 0;
++    return 0 if $year % 100 == 0;
++    return 1 if $year % 4   == 0;
++}
++
++
++my @Day_Names   = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat");
++my @Month_Names = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
++                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec");
++
++for my $func (qw(localtime gmtime)) {
++    my $func64 = do {
++        no strict 'refs';
++        \&{$func . "64"};
++    };
++
++    my $code = sub {
++        my $time = @_ ? shift : time;
++
++        my @date = $func64->($time);
++        return @date if wantarray;
++        return sprintf "%s %s %2d %02d:%02d:%02d %.0f",
++          $Day_Names[$date[6]], $Month_Names[$date[4]], $date[3],
++          $date[2], $date[1], $date[0],
++          $date[5] + 1900;
++    };
++    
++    no strict 'refs';
++    *{$func} = $code;
++}
++
++sub timegm
++{
++    my @date = @_[0..5];
++    $date[5] = munge_year($date[5]);
++
++    return timegm64(@date);
++}
++
++sub UNIX_TIMESTAMP
++{
++    my $date_time = shift;
++    my $unix_timestamp;
++
++    my $year;
++    my $month;
++    my $day;
++    my $hour;
++    my $min;
++    my $sec;
++    if ($date_time =~ /^0000-?00-?00( ?00:?00:?00)?$/)
++    {
++            return '';
++    }
++    elsif ($date_time =~ /^(-?\d{4,})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}):(\d{2}))?$/)
++    {
++        # DATE or DATETIME
++        # "YYYY-MM-DD" or "YYYY-MM-DD hh:mm:ss"
++        $year  = $1;
++        $month = $2;
++        $day   = $3;
++        $hour  = $4 || '00';
++        $min   = $5 || '00';
++        $sec   = $6 || '00';
++    }
++    elsif ($date_time =~ /^(-?\d{4,}|-?\d{2})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2}))?$/)
++    {
++        # DATE or DATETIME
++        # "YYYYMMDD" or "YYMMDD" or "YYYYMMDDhhmmss" or "YYMMDDhhmmss"
++        $year  = $1;
++        $month = $2;
++        $day   = $3;
++        $hour  = $4 || '00';
++        $min   = $5 || '00';
++        $sec   = $6 || '00';
++
++        if ($year =~ /^\d{2}$/)
++        {
++            if ($year >= 0 and $year < 38)
++            {
++                    $year += 2000;
++            }
++            else
++            {
++                    $year += 1900;
++            }
++            warn "Year $year is likely to break something" if $year < 1970;
++        }
++    }
++
++    my $m = $month - 1;
++    my @localtime = ($sec, $min, $hour, $day, $m, $year);
++
++    $unix_timestamp = &timelocal(@localtime);
++
++    return $unix_timestamp;
++}
++
++sub FROM_UNIXTIME
++{
++    my $unix_timestamp = shift;
++
++    if ($unix_timestamp eq '') ### want to warn if undef
++    {
++        return '0000-00-00 00:00:00';
++    }
++    elsif ($unix_timestamp !~ /^-?\d+$/)
++    {
++        cluck "Invalid DATE_TIME '$unix_timestamp'";
++        return '0000-00-00 00:00:00';
++    }
++
++    my @localtime = &localtime($unix_timestamp);
++
++    my $year  = $localtime[5] + 1900;
++    my $month = $localtime[4] + 1;
++    my $day   = $localtime[3];
++    my $hour  = $localtime[2];
++    my $min   = $localtime[1];
++    my $sec   = $localtime[0];
++
++    my $date_time = sprintf "%04d-%02d-%02d %02d:%02d:%02d", $year, $month, $day, $hour, $min, $sec;
++
++    return $date_time;
++}
++
++1; # of rings to rule them all.
++
++__END__
++
++=head1 NAME
++
++Time::Local::Extended - Increase the range of localtime and timelocal
++
++=head1 SYNOPSIS
++
++  use Time::Local::Extended qw(:ALL);
++
++  my @localtime   = localtime(2**31);
++  my $seconds     = timelocal(0,0,0,1,10,170);
++  my $gmt_seconds = timegm(0,0,0,1,10,170);
++  my $gmt_time    = gmtime(2**31);
++  my $ux_time     = UNIX_TIMESTAMP('2097-07-04 12:34:56');
++  my $date        = FROM_UNIXTIME(2**31);
++
++  my $sql = qq(
++         SELECT start_time
++         FROM   projects
++         WHERE  project_id = '1'
++  );
++  my $date_time = $dbh->selectrow_array($sql); # '2097-07-04 12:34:56'
++  my $ux_time   = UNIX_TIMESTAMP($date_time);  # 4023794096
++
++  my $date_time = FROM_UNIXTIME(2**31);
++  my $sql  = qq(
++         UPDATE projects
++         SET    start_time = '$date_time'
++         WHERE  project_id = '1'
++  );
++
++=head1 DESCRIPTION
++
++This module extends the date range of localtime(), gmtime(), timegm()
++and timelocal() to go safely beyond 2038 and before 1970 on any
++operating system.
++
++It also provides a handful of useful time conversion functions.
++
++
++=head1 PUBLIC FUNCTIONS
++
++=over 4
++
++=item * B<timelocal>
++
++Invoked in the same way as Time::Local::timelocal().
++
++=item * B<localtime>
++
++Invoked in the same way as CORE::localtime().
++
++=item * B<timegm>
++
++Invoked in the same way as Time::Local::timegm().
++
++=item * B<gmtime>
++
++Invoked in the same way as CORE::gmtime().
++
++=item * B<UNIX_TIMESTAMP>
++
++Invoked similarly to the MySQL UNIX_TIMESTAMP() function()
++
++=item * B<FROM_UNIXTIME>
++
++Invoked similarly to the MySQL FROM_UNIXTIME() function()
++
++=back
++
++=head1 LIMITATIONS
++
++Because of the way timegm() and timelocal() try to Do What You Mean
++with the year, it is impossible to feed it the years 0 through 99 (it
++thinks you mean 2000 - 2099).
++
++While the code can in theory go out to 2**63, the practical portable
++limit of this code is from 2**52 to -2**52 (the limit of double
++floating point precision) after which precision starts to drop off.
++This gives you a range of about +/- 142 million years.
++
++=head1 BUGS
++
++Please e-mail bug reports or suggestions to bobo@cpan.org.  Thanks!
++
++=head1 TODO
++
++  1) Trap Time::Local::timelocal die in an eval {}.
++  2) Add support for timelocal_nocheck and timegm_nocheck.
++  3) Clean up.  Lots of clean up.
++
++=head1 CREDITS
++
++Thanks to Peter Kioko <ceph@techie.com> for helping to refine the idea.
++Thanks to Adam Foxson <afoxson@pobox.com> for quality assurance and
++for being the Human CPAN Reference Manual.
++
++=head1 AUTHOR
++
++Bob O'Neill, E<lt>bobo@cpan.orgE<gt>
++ 
++=head1 COPYRIGHT AND LICENSE
++
++Copyright (C) 2003-2004 Bob O'Neill.
++All rights reserved.
++
++See COPYING for license
++
++=head1 SEE ALSO
++
++=over 4
++
++=item * L<perl>.
++
++=item * L<Time::Local>.
++
++=back
++
++=cut
+diff --git a/munge_config b/munge_config
+new file mode 100644
+index 0000000..f121291
+--- /dev/null
++++ b/munge_config
+@@ -0,0 +1,13 @@
++#!/usr/bin/perl -w
++
++use Config;
++
++my $output_file = shift;
++my $input_file  = $output_file . ".in";
++
++open my $input_fh, $input_file          or die "Can't open $input_file: $!";
++open my $output_fh, ">$output_file"     or die "Can't open $output_file: $!";
++while(<$input_fh>) {
++    s{%%(.*)%%}{$Config{$1}}g;
++    print $output_fh $_;
++}
+diff --git a/ppport.h b/ppport.h
+new file mode 100644
+index 0000000..b8b5299
+--- /dev/null
++++ b/ppport.h
+@@ -0,0 +1,2696 @@
++#if 0
++<<'SKIP';
++#endif
++/*
++----------------------------------------------------------------------
++
++    ppport.h -- Perl/Pollution/Portability Version 3.14
++
++    Automatically created by Devel::PPPort running under perl 5.008008.
++
++    Version 3.x, Copyright (c) 2004-2008, Marcus Holland-Moritz.
++
++    Version 2.x, Copyright (C) 2001, Paul Marquess.
++
++    Version 1.x, Copyright (C) 1999, Kenneth Albanowski.
++
++    This program is free software; you can redistribute it and/or
++    modify it under the same terms as Perl itself.
++
++----------------------------------------------------------------------
++
++SKIP
++if (@ARGV && $ARGV[0] eq '--unstrip') {
++  eval { require Devel::PPPort };
++  $@ and die "Cannot require Devel::PPPort, please install.\n";
++  if ($Devel::PPPort::VERSION < 3.14) {
++    die "ppport.h was originally generated with Devel::PPPort 3.14.\n"
++      . "Your Devel::PPPort is only version $Devel::PPPort::VERSION.\n"
++      . "Please install a newer version, or --unstrip will not work.\n";
++  }
++  Devel::PPPort::WriteFile($0);
++  exit 0;
++}
++print <<END;
++
++Sorry, but this is a stripped version of $0.
++
++To be able to use its original script and doc functionality,
++please try to regenerate this file using:
++
++  $^X $0 --unstrip
++
++END
++__DATA__*/
++#ifndef _P_P_PORTABILITY_H_
++#define _P_P_PORTABILITY_H_
++#ifndef DPPP_NAMESPACE
++#define DPPP_NAMESPACE DPPP_
++#endif
++#define DPPP_CAT2(x,y) CAT2(x,y)
++#define DPPP_(name) DPPP_CAT2(DPPP_NAMESPACE, name)
++#ifndef PERL_REVISION
++#if !defined(__PATCHLEVEL_H_INCLUDED__) && !(defined(PATCHLEVEL) && defined(SUBVERSION))
++#define PERL_PATCHLEVEL_H_IMPLICIT
++#include <patchlevel.h>
++#endif
++#if !(defined(PERL_VERSION) || (defined(SUBVERSION) && defined(PATCHLEVEL)))
++#include <could_not_find_Perl_patchlevel.h>
++#endif
++#ifndef PERL_REVISION
++#define PERL_REVISION (5)
++#define PERL_VERSION PATCHLEVEL
++#define PERL_SUBVERSION SUBVERSION
++#endif
++#endif
++#define _dpppDEC2BCD(dec) ((((dec)/100)<<8)|((((dec)%100)/10)<<4)|((dec)%10))
++#define PERL_BCDVERSION ((_dpppDEC2BCD(PERL_REVISION)<<24)|(_dpppDEC2BCD(PERL_VERSION)<<12)|_dpppDEC2BCD(PERL_SUBVERSION))
++#if PERL_REVISION != 5
++#error ppport.h only works with Perl version 5
++#endif
++#ifdef I_LIMITS
++#include <limits.h>
++#endif
++#ifndef PERL_UCHAR_MIN
++#define PERL_UCHAR_MIN ((unsigned char)0)
++#endif
++#ifndef PERL_UCHAR_MAX
++#ifdef UCHAR_MAX
++#define PERL_UCHAR_MAX ((unsigned char)UCHAR_MAX)
++#else
++#ifdef MAXUCHAR
++#define PERL_UCHAR_MAX ((unsigned char)MAXUCHAR)
++#else
++#define PERL_UCHAR_MAX ((unsigned char)~(unsigned)0)
++#endif
++#endif
++#endif
++#ifndef PERL_USHORT_MIN
++#define PERL_USHORT_MIN ((unsigned short)0)
++#endif
++#ifndef PERL_USHORT_MAX
++#ifdef USHORT_MAX
++#define PERL_USHORT_MAX ((unsigned short)USHORT_MAX)
++#else
++#ifdef MAXUSHORT
++#define PERL_USHORT_MAX ((unsigned short)MAXUSHORT)
++#else
++#ifdef USHRT_MAX
++#define PERL_USHORT_MAX ((unsigned short)USHRT_MAX)
++#else
++#define PERL_USHORT_MAX ((unsigned short)~(unsigned)0)
++#endif
++#endif
++#endif
++#endif
++#ifndef PERL_SHORT_MAX
++#ifdef SHORT_MAX
++#define PERL_SHORT_MAX ((short)SHORT_MAX)
++#else
++#ifdef MAXSHORT
++#define PERL_SHORT_MAX ((short)MAXSHORT)
++#else
++#ifdef SHRT_MAX
++#define PERL_SHORT_MAX ((short)SHRT_MAX)
++#else
++#define PERL_SHORT_MAX ((short) (PERL_USHORT_MAX >> 1))
++#endif
++#endif
++#endif
++#endif
++#ifndef PERL_SHORT_MIN
++#ifdef SHORT_MIN
++#define PERL_SHORT_MIN ((short)SHORT_MIN)
++#else
++#ifdef MINSHORT
++#define PERL_SHORT_MIN ((short)MINSHORT)
++#else
++#ifdef SHRT_MIN
++#define PERL_SHORT_MIN ((short)SHRT_MIN)
++#else
++#define PERL_SHORT_MIN (-PERL_SHORT_MAX - ((3 & -1) == 3))
++#endif
++#endif
++#endif
++#endif
++#ifndef PERL_UINT_MAX
++#ifdef UINT_MAX
++#define PERL_UINT_MAX ((unsigned int)UINT_MAX)
++#else
++#ifdef MAXUINT
++#define PERL_UINT_MAX ((unsigned int)MAXUINT)
++#else
++#define PERL_UINT_MAX (~(unsigned int)0)
++#endif
++#endif
++#endif
++#ifndef PERL_UINT_MIN
++#define PERL_UINT_MIN ((unsigned int)0)
++#endif
++#ifndef PERL_INT_MAX
++#ifdef INT_MAX
++#define PERL_INT_MAX ((int)INT_MAX)
++#else
++#ifdef MAXINT
++#define PERL_INT_MAX ((int)MAXINT)
++#else
++#define PERL_INT_MAX ((int)(PERL_UINT_MAX >> 1))
++#endif
++#endif
++#endif
++#ifndef PERL_INT_MIN
++#ifdef INT_MIN
++#define PERL_INT_MIN ((int)INT_MIN)
++#else
++#ifdef MININT
++#define PERL_INT_MIN ((int)MININT)
++#else
++#define PERL_INT_MIN (-PERL_INT_MAX - ((3 & -1) == 3))
++#endif
++#endif
++#endif
++#ifndef PERL_ULONG_MAX
++#ifdef ULONG_MAX
++#define PERL_ULONG_MAX ((unsigned long)ULONG_MAX)
++#else
++#ifdef MAXULONG
++#define PERL_ULONG_MAX ((unsigned long)MAXULONG)
++#else
++#define PERL_ULONG_MAX (~(unsigned long)0)
++#endif
++#endif
++#endif
++#ifndef PERL_ULONG_MIN
++#define PERL_ULONG_MIN ((unsigned long)0L)
++#endif
++#ifndef PERL_LONG_MAX
++#ifdef LONG_MAX
++#define PERL_LONG_MAX ((long)LONG_MAX)
++#else
++#ifdef MAXLONG
++#define PERL_LONG_MAX ((long)MAXLONG)
++#else
++#define PERL_LONG_MAX ((long) (PERL_ULONG_MAX >> 1))
++#endif
++#endif
++#endif
++#ifndef PERL_LONG_MIN
++#ifdef LONG_MIN
++#define PERL_LONG_MIN ((long)LONG_MIN)
++#else
++#ifdef MINLONG
++#define PERL_LONG_MIN ((long)MINLONG)
++#else
++#define PERL_LONG_MIN (-PERL_LONG_MAX - ((3 & -1) == 3))
++#endif
++#endif
++#endif
++#if defined(HAS_QUAD) && (defined(convex) || defined(uts))
++#ifndef PERL_UQUAD_MAX
++#ifdef ULONGLONG_MAX
++#define PERL_UQUAD_MAX ((unsigned long long)ULONGLONG_MAX)
++#else
++#ifdef MAXULONGLONG
++#define PERL_UQUAD_MAX ((unsigned long long)MAXULONGLONG)
++#else
++#define PERL_UQUAD_MAX (~(unsigned long long)0)
++#endif
++#endif
++#endif
++#ifndef PERL_UQUAD_MIN
++#define PERL_UQUAD_MIN ((unsigned long long)0L)
++#endif
++#ifndef PERL_QUAD_MAX
++#ifdef LONGLONG_MAX
++#define PERL_QUAD_MAX ((long long)LONGLONG_MAX)
++#else
++#ifdef MAXLONGLONG
++#define PERL_QUAD_MAX ((long long)MAXLONGLONG)
++#else
++#define PERL_QUAD_MAX ((long long) (PERL_UQUAD_MAX >> 1))
++#endif
++#endif
++#endif
++#ifndef PERL_QUAD_MIN
++#ifdef LONGLONG_MIN
++#define PERL_QUAD_MIN ((long long)LONGLONG_MIN)
++#else
++#ifdef MINLONGLONG
++#define PERL_QUAD_MIN ((long long)MINLONGLONG)
++#else
++#define PERL_QUAD_MIN (-PERL_QUAD_MAX - ((3 & -1) == 3))
++#endif
++#endif
++#endif
++#endif
++#ifdef HAS_QUAD
++#ifdef cray
++#ifndef IVTYPE
++#define IVTYPE int
++#endif
++#ifndef IV_MIN
++#define IV_MIN PERL_INT_MIN
++#endif
++#ifndef IV_MAX
++#define IV_MAX PERL_INT_MAX
++#endif
++#ifndef UV_MIN
++#define UV_MIN PERL_UINT_MIN
++#endif
++#ifndef UV_MAX
++#define UV_MAX PERL_UINT_MAX
++#endif
++#ifdef INTSIZE
++#ifndef IVSIZE
++#define IVSIZE INTSIZE
++#endif
++#endif
++#else
++#if defined(convex) || defined(uts)
++#ifndef IVTYPE
++#define IVTYPE long long
++#endif
++#ifndef IV_MIN
++#define IV_MIN PERL_QUAD_MIN
++#endif
++#ifndef IV_MAX
++#define IV_MAX PERL_QUAD_MAX
++#endif
++#ifndef UV_MIN
++#define UV_MIN PERL_UQUAD_MIN
++#endif
++#ifndef UV_MAX
++#define UV_MAX PERL_UQUAD_MAX
++#endif
++#ifdef LONGLONGSIZE
++#ifndef IVSIZE
++#define IVSIZE LONGLONGSIZE
++#endif
++#endif
++#else
++#ifndef IVTYPE
++#define IVTYPE long
++#endif
++#ifndef IV_MIN
++#define IV_MIN PERL_LONG_MIN
++#endif
++#ifndef IV_MAX
++#define IV_MAX PERL_LONG_MAX
++#endif
++#ifndef UV_MIN
++#define UV_MIN PERL_ULONG_MIN
++#endif
++#ifndef UV_MAX
++#define UV_MAX PERL_ULONG_MAX
++#endif
++#ifdef LONGSIZE
++#ifndef IVSIZE
++#define IVSIZE LONGSIZE
++#endif
++#endif
++#endif
++#endif
++#ifndef IVSIZE
++#define IVSIZE 8
++#endif
++#ifndef PERL_QUAD_MIN
++#define PERL_QUAD_MIN IV_MIN
++#endif
++#ifndef PERL_QUAD_MAX
++#define PERL_QUAD_MAX IV_MAX
++#endif
++#ifndef PERL_UQUAD_MIN
++#define PERL_UQUAD_MIN UV_MIN
++#endif
++#ifndef PERL_UQUAD_MAX
++#define PERL_UQUAD_MAX UV_MAX
++#endif
++#else
++#ifndef IVTYPE
++#define IVTYPE long
++#endif
++#ifndef IV_MIN
++#define IV_MIN PERL_LONG_MIN
++#endif
++#ifndef IV_MAX
++#define IV_MAX PERL_LONG_MAX
++#endif
++#ifndef UV_MIN
++#define UV_MIN PERL_ULONG_MIN
++#endif
++#ifndef UV_MAX
++#define UV_MAX PERL_ULONG_MAX
++#endif
++#endif
++#ifndef IVSIZE
++#ifdef LONGSIZE
++#define IVSIZE LONGSIZE
++#else
++#define IVSIZE 4
++#endif
++#endif
++#ifndef UVTYPE
++#define UVTYPE unsigned IVTYPE
++#endif
++#ifndef UVSIZE
++#define UVSIZE IVSIZE
++#endif
++#ifndef sv_setuv
++#define sv_setuv(sv, uv) \
++STMT_START { \
++UV TeMpUv = uv; \
++if (TeMpUv <= IV_MAX) \
++sv_setiv(sv, TeMpUv); \
++else \
++sv_setnv(sv, (double)TeMpUv); \
++} STMT_END
++#endif
++#ifndef newSVuv
++#define newSVuv(uv) ((uv) <= IV_MAX ? newSViv((IV)uv) : newSVnv((NV)uv))
++#endif
++#ifndef sv_2uv
++#define sv_2uv(sv) ((PL_Sv = (sv)), (UV) (SvNOK(PL_Sv) ? SvNV(PL_Sv) : sv_2nv(PL_Sv)))
++#endif
++#ifndef SvUVX
++#define SvUVX(sv) ((UV)SvIVX(sv))
++#endif
++#ifndef SvUVXx
++#define SvUVXx(sv) SvUVX(sv)
++#endif
++#ifndef SvUV
++#define SvUV(sv) (SvIOK(sv) ? SvUVX(sv) : sv_2uv(sv))
++#endif
++#ifndef SvUVx
++#define SvUVx(sv) ((PL_Sv = (sv)), SvUV(PL_Sv))
++#endif
++#ifndef sv_uv
++#define sv_uv(sv) SvUVx(sv)
++#endif
++#if !defined(SvUOK) && defined(SvIOK_UV)
++#define SvUOK(sv) SvIOK_UV(sv)
++#endif
++#ifndef XST_mUV
++#define XST_mUV(i,v) (ST(i) = sv_2mortal(newSVuv(v)) )
++#endif
++#ifndef XSRETURN_UV
++#define XSRETURN_UV(v) STMT_START { XST_mUV(0,v); XSRETURN(1); } STMT_END
++#endif
++#ifndef PUSHu
++#define PUSHu(u) STMT_START { sv_setuv(TARG, (UV)(u)); PUSHTARG; } STMT_END
++#endif
++#ifndef XPUSHu
++#define XPUSHu(u) STMT_START { sv_setuv(TARG, (UV)(u)); XPUSHTARG; } STMT_END
++#endif
++#ifdef HAS_MEMCMP
++#ifndef memNE
++#define memNE(s1,s2,l) (memcmp(s1,s2,l))
++#endif
++#ifndef memEQ
++#define memEQ(s1,s2,l) (!memcmp(s1,s2,l))
++#endif
++#else
++#ifndef memNE
++#define memNE(s1,s2,l) (bcmp(s1,s2,l))
++#endif
++#ifndef memEQ
++#define memEQ(s1,s2,l) (!bcmp(s1,s2,l))
++#endif
++#endif
++#ifndef MoveD
++#define MoveD(s,d,n,t) memmove((char*)(d),(char*)(s), (n) * sizeof(t))
++#endif
++#ifndef CopyD
++#define CopyD(s,d,n,t) memcpy((char*)(d),(char*)(s), (n) * sizeof(t))
++#endif
++#ifdef HAS_MEMSET
++#ifndef ZeroD
++#define ZeroD(d,n,t) memzero((char*)(d), (n) * sizeof(t))
++#endif
++#else
++#ifndef ZeroD
++#define ZeroD(d,n,t) ((void)memzero((char*)(d), (n) * sizeof(t)), d)
++#endif
++#endif
++#ifndef PoisonWith
++#define PoisonWith(d,n,t,b) (void)memset((char*)(d), (U8)(b), (n) * sizeof(t))
++#endif
++#ifndef PoisonNew
++#define PoisonNew(d,n,t) PoisonWith(d,n,t,0xAB)
++#endif
++#ifndef PoisonFree
++#define PoisonFree(d,n,t) PoisonWith(d,n,t,0xEF)
++#endif
++#ifndef Poison
++#define Poison(d,n,t) PoisonFree(d,n,t)
++#endif
++#ifndef Newx
++#define Newx(v,n,t) New(0,v,n,t)
++#endif
++#ifndef Newxc
++#define Newxc(v,n,t,c) Newc(0,v,n,t,c)
++#endif
++#ifndef Newxz
++#define Newxz(v,n,t) Newz(0,v,n,t)
++#endif
++#ifndef PERL_UNUSED_DECL
++#ifdef HASATTRIBUTE
++#if (defined(__GNUC__) && defined(__cplusplus)) || defined(__INTEL_COMPILER)
++#define PERL_UNUSED_DECL
++#else
++#define PERL_UNUSED_DECL __attribute__((unused))
++#endif
++#else
++#define PERL_UNUSED_DECL
++#endif
++#endif
++#ifndef PERL_UNUSED_ARG
++#if defined(lint) && defined(S_SPLINT_S)
++#include <note.h>
++#define PERL_UNUSED_ARG(x) NOTE(ARGUNUSED(x))
++#else
++#define PERL_UNUSED_ARG(x) ((void)x)
++#endif
++#endif
++#ifndef PERL_UNUSED_VAR
++#define PERL_UNUSED_VAR(x) ((void)x)
++#endif
++#ifndef PERL_UNUSED_CONTEXT
++#ifdef USE_ITHREADS
++#define PERL_UNUSED_CONTEXT PERL_UNUSED_ARG(my_perl)
++#else
++#define PERL_UNUSED_CONTEXT
++#endif
++#endif
++#ifndef NOOP
++#define NOOP (void)0
++#endif
++#ifndef dNOOP
++#define dNOOP extern int  Perl___notused PERL_UNUSED_DECL
++#endif
++#ifndef NVTYPE
++#if defined(USE_LONG_DOUBLE) && defined(HAS_LONG_DOUBLE)
++#define NVTYPE long double
++#else
++#define NVTYPE double
++#endif
++typedef NVTYPE NV;
++#endif
++#ifndef INT2PTR
++#if (IVSIZE == PTRSIZE) && (UVSIZE == PTRSIZE)
++#define PTRV UV
++#define INT2PTR(any,d) (any)(d)
++#else
++#if PTRSIZE == LONGSIZE
++#define PTRV unsigned long
++#else
++#define PTRV unsigned
++#endif
++#define INT2PTR(any,d) (any)(PTRV)(d)
++#endif
++#define NUM2PTR(any,d) (any)(PTRV)(d)
++#define PTR2IV(p) INT2PTR(IV,p)
++#define PTR2UV(p) INT2PTR(UV,p)
++#define PTR2NV(p) NUM2PTR(NV,p)
++#if PTRSIZE == LONGSIZE
++#define PTR2ul(p) (unsigned long)(p)
++#else
++#define PTR2ul(p) INT2PTR(unsigned long,p)
++#endif
++#endif
++#undef START_EXTERN_C
++#undef END_EXTERN_C
++#undef EXTERN_C
++#ifdef __cplusplus
++#define START_EXTERN_C extern "C" {
++#define END_EXTERN_C }
++#define EXTERN_C extern "C"
++#else
++#define START_EXTERN_C
++#define END_EXTERN_C
++#define EXTERN_C extern
++#endif
++#if defined(PERL_GCC_PEDANTIC)
++#ifndef PERL_GCC_BRACE_GROUPS_FORBIDDEN
++#define PERL_GCC_BRACE_GROUPS_FORBIDDEN
++#endif
++#endif
++#if defined(__GNUC__) && !defined(PERL_GCC_BRACE_GROUPS_FORBIDDEN) && !defined(__cplusplus)
++#ifndef PERL_USE_GCC_BRACE_GROUPS
++#define PERL_USE_GCC_BRACE_GROUPS
++#endif
++#endif
++#undef STMT_START
++#undef STMT_END
++#ifdef PERL_USE_GCC_BRACE_GROUPS
++#define STMT_START (void)(
++#define STMT_END )
++#else
++#if defined(VOIDFLAGS) && (VOIDFLAGS) && (defined(sun) || defined(__sun__)) && !defined(__GNUC__)
++#define STMT_START if (1)
++#define STMT_END else (void)0
++#else
++#define STMT_START do
++#define STMT_END while (0)
++#endif
++#endif
++#ifndef boolSV
++#define boolSV(b) ((b) ? &PL_sv_yes : &PL_sv_no)
++#endif
++#ifndef DEFSV
++#define DEFSV GvSV(PL_defgv)
++#endif
++#ifndef SAVE_DEFSV
++#define SAVE_DEFSV SAVESPTR(GvSV(PL_defgv))
++#endif
++#ifndef AvFILLp
++#define AvFILLp AvFILL
++#endif
++#ifndef ERRSV
++#define ERRSV get_sv("@",FALSE)
++#endif
++#ifndef gv_stashpvn
++#define gv_stashpvn(str,len,create) gv_stashpv(str,create)
++#endif
++#ifndef get_cv
++#define get_cv perl_get_cv
++#endif
++#ifndef get_sv
++#define get_sv perl_get_sv
++#endif
++#ifndef get_av
++#define get_av perl_get_av
++#endif
++#ifndef get_hv
++#define get_hv perl_get_hv
++#endif
++#ifndef dUNDERBAR
++#define dUNDERBAR dNOOP
++#endif
++#ifndef UNDERBAR
++#define UNDERBAR DEFSV
++#endif
++#ifndef dAX
++#define dAX I32 ax = MARK - PL_stack_base + 1
++#endif
++#ifndef dITEMS
++#define dITEMS I32 items = SP - MARK
++#endif
++#ifndef dXSTARG
++#define dXSTARG SV * targ = sv_newmortal()
++#endif
++#ifndef dAXMARK
++#define dAXMARK I32 ax = POPMARK; \
++register SV ** const mark = PL_stack_base + ax++
++#endif
++#ifndef XSprePUSH
++#define XSprePUSH (sp = PL_stack_base + ax - 1)
++#endif
++#if (PERL_BCDVERSION < 0x5005000)
++#undef XSRETURN
++#define XSRETURN(off) \
++STMT_START { \
++PL_stack_sp = PL_stack_base + ax + ((off) - 1); \
++return; \
++} STMT_END
++#endif
++#ifndef PERL_ABS
++#define PERL_ABS(x) ((x) < 0 ? -(x) : (x))
++#endif
++#ifndef dVAR
++#define dVAR dNOOP
++#endif
++#ifndef SVf
++#define SVf "_"
++#endif
++#ifndef UTF8_MAXBYTES
++#define UTF8_MAXBYTES UTF8_MAXLEN
++#endif
++#ifndef PERL_HASH
++#define PERL_HASH(hash,str,len) \
++STMT_START { \
++const char *s_PeRlHaSh = str; \
++I32 i_PeRlHaSh = len; \
++U32 hash_PeRlHaSh = 0; \
++while (i_PeRlHaSh--) \
++hash_PeRlHaSh = hash_PeRlHaSh * 33 + *s_PeRlHaSh++; \
++(hash) = hash_PeRlHaSh; \
++} STMT_END
++#endif
++#ifndef PERL_SIGNALS_UNSAFE_FLAG
++#define PERL_SIGNALS_UNSAFE_FLAG 0x0001
++#if (PERL_BCDVERSION < 0x5008000)
++#define D_PPP_PERL_SIGNALS_INIT PERL_SIGNALS_UNSAFE_FLAG
++#else
++#define D_PPP_PERL_SIGNALS_INIT 0
++#endif
++#if defined(NEED_PL_signals)
++static U32 DPPP_(my_PL_signals) = D_PPP_PERL_SIGNALS_INIT;
++#elif defined(NEED_PL_signals_GLOBAL)
++U32 DPPP_(my_PL_signals) = D_PPP_PERL_SIGNALS_INIT;
++#else
++extern U32 DPPP_(my_PL_signals);
++#endif
++#define PL_signals DPPP_(my_PL_signals)
++#endif
++#if (PERL_BCDVERSION <= 0x5005005)
++#define PL_ppaddr ppaddr
++#define PL_no_modify no_modify
++#endif
++#if (PERL_BCDVERSION <= 0x5004005)
++#define PL_DBsignal DBsignal
++#define PL_DBsingle DBsingle
++#define PL_DBsub DBsub
++#define PL_DBtrace DBtrace
++#define PL_Sv Sv
++#define PL_compiling compiling
++#define PL_copline copline
++#define PL_curcop curcop
++#define PL_curstash curstash
++#define PL_debstash debstash
++#define PL_defgv defgv
++#define PL_diehook diehook
++#define PL_dirty dirty
++#define PL_dowarn dowarn
++#define PL_errgv errgv
++#define PL_expect expect
++#define PL_hexdigit hexdigit
++#define PL_hints hints
++#define PL_laststatval laststatval
++#define PL_na na
++#define PL_perl_destruct_level perl_destruct_level
++#define PL_perldb perldb
++#define PL_rsfp_filters rsfp_filters
++#define PL_rsfp rsfp
++#define PL_stack_base stack_base
++#define PL_stack_sp stack_sp
++#define PL_statcache statcache
++#define PL_stdingv stdingv
++#define PL_sv_arenaroot sv_arenaroot
++#define PL_sv_no sv_no
++#define PL_sv_undef sv_undef
++#define PL_sv_yes sv_yes
++#define PL_tainted tainted
++#define PL_tainting tainting
++#endif
++#if (PERL_BCDVERSION >= 0x5009005)
++#define PL_expect (PL_parser ? PL_parser->expect : 0)
++#define PL_copline (PL_parser ? PL_parser->copline : 0)
++#define PL_rsfp (PL_parser ? PL_parser->rsfp : (PerlIO *) 0)
++#define PL_rsfp_filters (PL_parser ? PL_parser->rsfp_filters : (AV *) 0)
++#endif
++#ifndef dTHR
++#define dTHR dNOOP
++#endif
++#ifndef dTHX
++#define dTHX dNOOP
++#endif
++#ifndef dTHXa
++#define dTHXa(x) dNOOP
++#endif
++#ifndef pTHX
++#define pTHX void
++#endif
++#ifndef pTHX_
++#define pTHX_
++#endif
++#ifndef aTHX
++#define aTHX
++#endif
++#ifndef aTHX_
++#define aTHX_
++#endif
++#if (PERL_BCDVERSION < 0x5006000)
++#ifdef USE_THREADS
++#define aTHXR thr
++#define aTHXR_ thr,
++#else
++#define aTHXR
++#define aTHXR_
++#endif
++#define dTHXR dTHR
++#else
++#define aTHXR aTHX
++#define aTHXR_ aTHX_
++#define dTHXR dTHX
++#endif
++#ifndef dTHXoa
++#define dTHXoa(x) dTHXa(x)
++#endif
++#ifndef mPUSHs
++#define mPUSHs(s) PUSHs(sv_2mortal(s))
++#endif
++#ifndef PUSHmortal
++#define PUSHmortal PUSHs(sv_newmortal())
++#endif
++#ifndef mPUSHp
++#define mPUSHp(p,l) sv_setpvn(PUSHmortal, (p), (l))
++#endif
++#ifndef mPUSHn
++#define mPUSHn(n) sv_setnv(PUSHmortal, (NV)(n))
++#endif
++#ifndef mPUSHi
++#define mPUSHi(i) sv_setiv(PUSHmortal, (IV)(i))
++#endif
++#ifndef mPUSHu
++#define mPUSHu(u) sv_setuv(PUSHmortal, (UV)(u))
++#endif
++#ifndef mXPUSHs
++#define mXPUSHs(s) XPUSHs(sv_2mortal(s))
++#endif
++#ifndef XPUSHmortal
++#define XPUSHmortal XPUSHs(sv_newmortal())
++#endif
++#ifndef mXPUSHp
++#define mXPUSHp(p,l) STMT_START { EXTEND(sp,1); sv_setpvn(PUSHmortal, (p), (l)); } STMT_END
++#endif
++#ifndef mXPUSHn
++#define mXPUSHn(n) STMT_START { EXTEND(sp,1); sv_setnv(PUSHmortal, (NV)(n)); } STMT_END
++#endif
++#ifndef mXPUSHi
++#define mXPUSHi(i) STMT_START { EXTEND(sp,1); sv_setiv(PUSHmortal, (IV)(i)); } STMT_END
++#endif
++#ifndef mXPUSHu
++#define mXPUSHu(u) STMT_START { EXTEND(sp,1); sv_setuv(PUSHmortal, (UV)(u)); } STMT_END
++#endif
++#ifndef call_sv
++#define call_sv perl_call_sv
++#endif
++#ifndef call_pv
++#define call_pv perl_call_pv
++#endif
++#ifndef call_argv
++#define call_argv perl_call_argv
++#endif
++#ifndef call_method
++#define call_method perl_call_method
++#endif
++#ifndef eval_sv
++#define eval_sv perl_eval_sv
++#endif
++#ifndef PERL_LOADMOD_DENY
++#define PERL_LOADMOD_DENY 0x1
++#endif
++#ifndef PERL_LOADMOD_NOIMPORT
++#define PERL_LOADMOD_NOIMPORT 0x2
++#endif
++#ifndef PERL_LOADMOD_IMPORT_OPS
++#define PERL_LOADMOD_IMPORT_OPS 0x4
++#endif
++#ifndef eval_pv
++#if defined(NEED_eval_pv)
++static SV* DPPP_(my_eval_pv)(char *p, I32 croak_on_error);
++static
++#else
++extern SV* DPPP_(my_eval_pv)(char *p, I32 croak_on_error);
++#endif
++#ifdef eval_pv
++#undef eval_pv
++#endif
++#define eval_pv(a,b) DPPP_(my_eval_pv)(aTHX_ a,b)
++#define Perl_eval_pv DPPP_(my_eval_pv)
++#if defined(NEED_eval_pv) || defined(NEED_eval_pv_GLOBAL)
++SV*
++DPPP_(my_eval_pv)(char *p, I32 croak_on_error)
++{
++dSP;
++SV* sv = newSVpv(p, 0);
++PUSHMARK(sp);
++eval_sv(sv, G_SCALAR);
++SvREFCNT_dec(sv);
++SPAGAIN;
++sv = POPs;
++PUTBACK;
++if (croak_on_error && SvTRUE(GvSV(errgv)))
++croak(SvPVx(GvSV(errgv), na));
++return sv;
++}
++#endif
++#endif
++#ifndef vload_module
++#if defined(NEED_vload_module)
++static void DPPP_(my_vload_module)(U32 flags, SV *name, SV *ver, va_list *args);
++static
++#else
++extern void DPPP_(my_vload_module)(U32 flags, SV *name, SV *ver, va_list *args);
++#endif
++#ifdef vload_module
++#undef vload_module
++#endif
++#define vload_module(a,b,c,d) DPPP_(my_vload_module)(aTHX_ a,b,c,d)
++#define Perl_vload_module DPPP_(my_vload_module)
++#if defined(NEED_vload_module) || defined(NEED_vload_module_GLOBAL)
++void
++DPPP_(my_vload_module)(U32 flags, SV *name, SV *ver, va_list *args)
++{
++dTHR;
++dVAR;
++OP *veop, *imop;
++OP * const modname = newSVOP(OP_CONST, 0, name);
++SvREADONLY_off(((SVOP*)modname)->op_sv);
++modname->op_private |= OPpCONST_BARE;
++if (ver) {
++veop = newSVOP(OP_CONST, 0, ver);
++}
++else
++veop = NULL;
++if (flags & PERL_LOADMOD_NOIMPORT) {
++imop = sawparens(newNULLLIST());
++}
++else if (flags & PERL_LOADMOD_IMPORT_OPS) {
++imop = va_arg(*args, OP*);
++}
++else {
++SV *sv;
++imop = NULL;
++sv = va_arg(*args, SV*);
++while (sv) {
++imop = append_elem(OP_LIST, imop, newSVOP(OP_CONST, 0, sv));
++sv = va_arg(*args, SV*);
++}
++}
++{
++const line_t ocopline = PL_copline;
++COP * const ocurcop = PL_curcop;
++const int oexpect = PL_expect;
++#if (PERL_BCDVERSION >= 0x5004000)
++utilize(!(flags & PERL_LOADMOD_DENY), start_subparse(FALSE, 0),
++veop, modname, imop);
++#else
++utilize(!(flags & PERL_LOADMOD_DENY), start_subparse(),
++modname, imop);
++#endif
++PL_expect = oexpect;
++PL_copline = ocopline;
++PL_curcop = ocurcop;
++}
++}
++#endif
++#endif
++#ifndef load_module
++#if defined(NEED_load_module)
++static void DPPP_(my_load_module)(U32 flags, SV *name, SV *ver, ...);
++static
++#else
++extern void DPPP_(my_load_module)(U32 flags, SV *name, SV *ver, ...);
++#endif
++#ifdef load_module
++#undef load_module
++#endif
++#define load_module DPPP_(my_load_module)
++#define Perl_load_module DPPP_(my_load_module)
++#if defined(NEED_load_module) || defined(NEED_load_module_GLOBAL)
++void
++DPPP_(my_load_module)(U32 flags, SV *name, SV *ver, ...)
++{
++va_list args;
++va_start(args, ver);
++vload_module(flags, name, ver, &args);
++va_end(args);
++}
++#endif
++#endif
++#ifndef newRV_inc
++#define newRV_inc(sv) newRV(sv)
++#endif
++#ifndef newRV_noinc
++#if defined(NEED_newRV_noinc)
++static SV * DPPP_(my_newRV_noinc)(SV *sv);
++static
++#else
++extern SV * DPPP_(my_newRV_noinc)(SV *sv);
++#endif
++#ifdef newRV_noinc
++#undef newRV_noinc
++#endif
++#define newRV_noinc(a) DPPP_(my_newRV_noinc)(aTHX_ a)
++#define Perl_newRV_noinc DPPP_(my_newRV_noinc)
++#if defined(NEED_newRV_noinc) || defined(NEED_newRV_noinc_GLOBAL)
++SV *
++DPPP_(my_newRV_noinc)(SV *sv)
++{
++SV *rv = (SV *)newRV(sv);
++SvREFCNT_dec(sv);
++return rv;
++}
++#endif
++#endif
++#if (PERL_BCDVERSION < 0x5004063) && (PERL_BCDVERSION != 0x5004005)
++#if defined(NEED_newCONSTSUB)
++static void DPPP_(my_newCONSTSUB)(HV *stash, const char *name, SV *sv);
++static
++#else
++extern void DPPP_(my_newCONSTSUB)(HV *stash, const char *name, SV *sv);
++#endif
++#ifdef newCONSTSUB
++#undef newCONSTSUB
++#endif
++#define newCONSTSUB(a,b,c) DPPP_(my_newCONSTSUB)(aTHX_ a,b,c)
++#define Perl_newCONSTSUB DPPP_(my_newCONSTSUB)
++#if defined(NEED_newCONSTSUB) || defined(NEED_newCONSTSUB_GLOBAL)
++void
++DPPP_(my_newCONSTSUB)(HV *stash, const char *name, SV *sv)
++{
++U32 oldhints = PL_hints;
++HV *old_cop_stash = PL_curcop->cop_stash;
++HV *old_curstash = PL_curstash;
++line_t oldline = PL_curcop->cop_line;
++PL_curcop->cop_line = PL_copline;
++PL_hints &= ~HINT_BLOCK_SCOPE;
++if (stash)
++PL_curstash = PL_curcop->cop_stash = stash;
++newSUB(
++#if (PERL_BCDVERSION < 0x5003022)
++start_subparse(),
++#elif (PERL_BCDVERSION == 0x5003022)
++start_subparse(0),
++#else
++start_subparse(FALSE, 0),
++#endif
++newSVOP(OP_CONST, 0, newSVpv((char *) name, 0)),
++newSVOP(OP_CONST, 0, &PL_sv_no),
++newSTATEOP(0, Nullch, newSVOP(OP_CONST, 0, sv))
++);
++PL_hints = oldhints;
++PL_curcop->cop_stash = old_cop_stash;
++PL_curstash = old_curstash;
++PL_curcop->cop_line = oldline;
++}
++#endif
++#endif
++#if defined(MULTIPLICITY) || defined(PERL_OBJECT) || \
++defined(PERL_CAPI) || defined(PERL_IMPLICIT_CONTEXT)
++#ifndef START_MY_CXT
++#define START_MY_CXT
++#if (PERL_BCDVERSION < 0x5004068)
++#define dMY_CXT_SV \
++SV *my_cxt_sv = get_sv(MY_CXT_KEY, FALSE)
++#else
++#define dMY_CXT_SV \
++SV *my_cxt_sv = *hv_fetch(PL_modglobal, MY_CXT_KEY, \
++sizeof(MY_CXT_KEY)-1, TRUE)
++#endif
++#define dMY_CXT \
++dMY_CXT_SV; \
++my_cxt_t *my_cxtp = INT2PTR(my_cxt_t*,SvUV(my_cxt_sv))
++#define MY_CXT_INIT \
++dMY_CXT_SV; \
++\
++my_cxt_t *my_cxtp = (my_cxt_t*)SvPVX(newSV(sizeof(my_cxt_t)-1));\
++Zero(my_cxtp, 1, my_cxt_t); \
++sv_setuv(my_cxt_sv, PTR2UV(my_cxtp))
++#define MY_CXT (*my_cxtp)
++#define pMY_CXT my_cxt_t *my_cxtp
++#define pMY_CXT_ pMY_CXT,
++#define _pMY_CXT ,pMY_CXT
++#define aMY_CXT my_cxtp
++#define aMY_CXT_ aMY_CXT,
++#define _aMY_CXT ,aMY_CXT
++#endif
++#ifndef MY_CXT_CLONE
++#define MY_CXT_CLONE \
++dMY_CXT_SV; \
++my_cxt_t *my_cxtp = (my_cxt_t*)SvPVX(newSV(sizeof(my_cxt_t)-1));\
++Copy(INT2PTR(my_cxt_t*, SvUV(my_cxt_sv)), my_cxtp, 1, my_cxt_t);\
++sv_setuv(my_cxt_sv, PTR2UV(my_cxtp))
++#endif
++#else
++#ifndef START_MY_CXT
++#define START_MY_CXT static my_cxt_t my_cxt;
++#define dMY_CXT_SV dNOOP
++#define dMY_CXT dNOOP
++#define MY_CXT_INIT NOOP
++#define MY_CXT my_cxt
++#define pMY_CXT void
++#define pMY_CXT_
++#define _pMY_CXT
++#define aMY_CXT
++#define aMY_CXT_
++#define _aMY_CXT
++#endif
++#ifndef MY_CXT_CLONE
++#define MY_CXT_CLONE NOOP
++#endif
++#endif
++#ifndef IVdf
++#if IVSIZE == LONGSIZE
++#define IVdf "ld"
++#define UVuf "lu"
++#define UVof "lo"
++#define UVxf "lx"
++#define UVXf "lX"
++#else
++#if IVSIZE == INTSIZE
++#define IVdf "d"
++#define UVuf "u"
++#define UVof "o"
++#define UVxf "x"
++#define UVXf "X"
++#endif
++#endif
++#endif
++#ifndef NVef
++#if defined(USE_LONG_DOUBLE) && defined(HAS_LONG_DOUBLE) && \
++defined(PERL_PRIfldbl) && (PERL_BCDVERSION != 0x5006000)
++#define NVef PERL_PRIeldbl
++#define NVff PERL_PRIfldbl
++#define NVgf PERL_PRIgldbl
++#else
++#define NVef "e"
++#define NVff "f"
++#define NVgf "g"
++#endif
++#endif
++#ifndef SvREFCNT_inc
++#ifdef PERL_USE_GCC_BRACE_GROUPS
++#define SvREFCNT_inc(sv) \
++({ \
++SV * const _sv = (SV*)(sv); \
++if (_sv) \
++(SvREFCNT(_sv))++; \
++_sv; \
++})
++#else
++#define SvREFCNT_inc(sv) \
++((PL_Sv=(SV*)(sv)) ? (++(SvREFCNT(PL_Sv)),PL_Sv) : NULL)
++#endif
++#endif
++#ifndef SvREFCNT_inc_simple
++#ifdef PERL_USE_GCC_BRACE_GROUPS
++#define SvREFCNT_inc_simple(sv) \
++({ \
++if (sv) \
++(SvREFCNT(sv))++; \
++(SV *)(sv); \
++})
++#else
++#define SvREFCNT_inc_simple(sv) \
++((sv) ? (SvREFCNT(sv)++,(SV*)(sv)) : NULL)
++#endif
++#endif
++#ifndef SvREFCNT_inc_NN
++#ifdef PERL_USE_GCC_BRACE_GROUPS
++#define SvREFCNT_inc_NN(sv) \
++({ \
++SV * const _sv = (SV*)(sv); \
++SvREFCNT(_sv)++; \
++_sv; \
++})
++#else
++#define SvREFCNT_inc_NN(sv) \
++(PL_Sv=(SV*)(sv),++(SvREFCNT(PL_Sv)),PL_Sv)
++#endif
++#endif
++#ifndef SvREFCNT_inc_void
++#ifdef PERL_USE_GCC_BRACE_GROUPS
++#define SvREFCNT_inc_void(sv) \
++({ \
++SV * const _sv = (SV*)(sv); \
++if (_sv) \
++(void)(SvREFCNT(_sv)++); \
++})
++#else
++#define SvREFCNT_inc_void(sv) \
++(void)((PL_Sv=(SV*)(sv)) ? ++(SvREFCNT(PL_Sv)) : 0)
++#endif
++#endif
++#ifndef SvREFCNT_inc_simple_void
++#define SvREFCNT_inc_simple_void(sv) STMT_START { if (sv) SvREFCNT(sv)++; } STMT_END
++#endif
++#ifndef SvREFCNT_inc_simple_NN
++#define SvREFCNT_inc_simple_NN(sv) (++SvREFCNT(sv), (SV*)(sv))
++#endif
++#ifndef SvREFCNT_inc_void_NN
++#define SvREFCNT_inc_void_NN(sv) (void)(++SvREFCNT((SV*)(sv)))
++#endif
++#ifndef SvREFCNT_inc_simple_void_NN
++#define SvREFCNT_inc_simple_void_NN(sv) (void)(++SvREFCNT((SV*)(sv)))
++#endif
++#ifndef newSVpvn
++#define newSVpvn(data,len) ((data) \
++? ((len) ? newSVpv((data), (len)) : newSVpv("", 0)) \
++: newSV(0))
++#endif
++#ifndef newSVpvn_utf8
++#define newSVpvn_utf8(s, len, u) newSVpvn_flags((s), (len), (u) ? SVf_UTF8 : 0)
++#endif
++#ifndef SVf_UTF8
++#define SVf_UTF8 0
++#endif
++#ifndef newSVpvn_flags
++#if defined(NEED_newSVpvn_flags)
++static SV * DPPP_(my_newSVpvn_flags)(pTHX_ const char * s, STRLEN len, U32 flags);
++static
++#else
++extern SV * DPPP_(my_newSVpvn_flags)(pTHX_ const char * s, STRLEN len, U32 flags);
++#endif
++#ifdef newSVpvn_flags
++#undef newSVpvn_flags
++#endif
++#define newSVpvn_flags(a,b,c) DPPP_(my_newSVpvn_flags)(aTHX_ a,b,c)
++#define Perl_newSVpvn_flags DPPP_(my_newSVpvn_flags)
++#if defined(NEED_newSVpvn_flags) || defined(NEED_newSVpvn_flags_GLOBAL)
++SV *
++DPPP_(my_newSVpvn_flags)(pTHX_ const char *s, STRLEN len, U32 flags)
++{
++SV *sv = newSVpvn(s, len);
++SvFLAGS(sv) |= (flags & SVf_UTF8);
++return (flags & SVs_TEMP) ? sv_2mortal(sv) : sv;
++}
++#endif
++#endif
++#if !defined(NEED_sv_2pv_flags) && defined(NEED_sv_2pv_nolen)
++#define NEED_sv_2pv_flags
++#endif
++#if !defined(NEED_sv_2pv_flags_GLOBAL) && defined(NEED_sv_2pv_nolen_GLOBAL)
++#define NEED_sv_2pv_flags_GLOBAL
++#endif
++#ifndef sv_2pv_nolen
++#define sv_2pv_nolen(sv) SvPV_nolen(sv)
++#endif
++#ifdef SvPVbyte
++#if (PERL_BCDVERSION < 0x5007000)
++#if defined(NEED_sv_2pvbyte)
++static char * DPPP_(my_sv_2pvbyte)(pTHX_ SV * sv, STRLEN * lp);
++static
++#else
++extern char * DPPP_(my_sv_2pvbyte)(pTHX_ SV * sv, STRLEN * lp);
++#endif
++#ifdef sv_2pvbyte
++#undef sv_2pvbyte
++#endif
++#define sv_2pvbyte(a,b) DPPP_(my_sv_2pvbyte)(aTHX_ a,b)
++#define Perl_sv_2pvbyte DPPP_(my_sv_2pvbyte)
++#if defined(NEED_sv_2pvbyte) || defined(NEED_sv_2pvbyte_GLOBAL)
++char *
++DPPP_(my_sv_2pvbyte)(pTHX_ SV *sv, STRLEN *lp)
++{
++sv_utf8_downgrade(sv,0);
++return SvPV(sv,*lp);
++}
++#endif
++#undef SvPVbyte
++#define SvPVbyte(sv, lp) \
++((SvFLAGS(sv) & (SVf_POK|SVf_UTF8)) == (SVf_POK) \
++? ((lp = SvCUR(sv)), SvPVX(sv)) : sv_2pvbyte(sv, &lp))
++#endif
++#else
++#define SvPVbyte SvPV
++#define sv_2pvbyte sv_2pv
++#endif
++#ifndef sv_2pvbyte_nolen
++#define sv_2pvbyte_nolen(sv) sv_2pv_nolen(sv)
++#endif
++#ifndef SV_IMMEDIATE_UNREF
++#define SV_IMMEDIATE_UNREF 0
++#endif
++#ifndef SV_GMAGIC
++#define SV_GMAGIC 0
++#endif
++#ifndef SV_COW_DROP_PV
++#define SV_COW_DROP_PV 0
++#endif
++#ifndef SV_UTF8_NO_ENCODING
++#define SV_UTF8_NO_ENCODING 0
++#endif
++#ifndef SV_NOSTEAL
++#define SV_NOSTEAL 0
++#endif
++#ifndef SV_CONST_RETURN
++#define SV_CONST_RETURN 0
++#endif
++#ifndef SV_MUTABLE_RETURN
++#define SV_MUTABLE_RETURN 0
++#endif
++#ifndef SV_SMAGIC
++#define SV_SMAGIC 0
++#endif
++#ifndef SV_HAS_TRAILING_NUL
++#define SV_HAS_TRAILING_NUL 0
++#endif
++#ifndef SV_COW_SHARED_HASH_KEYS
++#define SV_COW_SHARED_HASH_KEYS 0
++#endif
++#if (PERL_BCDVERSION < 0x5007002)
++#if defined(NEED_sv_2pv_flags)
++static char * DPPP_(my_sv_2pv_flags)(pTHX_ SV * sv, STRLEN * lp, I32 flags);
++static
++#else
++extern char * DPPP_(my_sv_2pv_flags)(pTHX_ SV * sv, STRLEN * lp, I32 flags);
++#endif
++#ifdef sv_2pv_flags
++#undef sv_2pv_flags
++#endif
++#define sv_2pv_flags(a,b,c) DPPP_(my_sv_2pv_flags)(aTHX_ a,b,c)
++#define Perl_sv_2pv_flags DPPP_(my_sv_2pv_flags)
++#if defined(NEED_sv_2pv_flags) || defined(NEED_sv_2pv_flags_GLOBAL)
++char *
++DPPP_(my_sv_2pv_flags)(pTHX_ SV *sv, STRLEN *lp, I32 flags)
++{
++STRLEN n_a = (STRLEN) flags;
++return sv_2pv(sv, lp ? lp : &n_a);
++}
++#endif
++#if defined(NEED_sv_pvn_force_flags)
++static char * DPPP_(my_sv_pvn_force_flags)(pTHX_ SV * sv, STRLEN * lp, I32 flags);
++static
++#else
++extern char * DPPP_(my_sv_pvn_force_flags)(pTHX_ SV * sv, STRLEN * lp, I32 flags);
++#endif
++#ifdef sv_pvn_force_flags
++#undef sv_pvn_force_flags
++#endif
++#define sv_pvn_force_flags(a,b,c) DPPP_(my_sv_pvn_force_flags)(aTHX_ a,b,c)
++#define Perl_sv_pvn_force_flags DPPP_(my_sv_pvn_force_flags)
++#if defined(NEED_sv_pvn_force_flags) || defined(NEED_sv_pvn_force_flags_GLOBAL)
++char *
++DPPP_(my_sv_pvn_force_flags)(pTHX_ SV *sv, STRLEN *lp, I32 flags)
++{
++STRLEN n_a = (STRLEN) flags;
++return sv_pvn_force(sv, lp ? lp : &n_a);
++}
++#endif
++#endif
++#if (PERL_BCDVERSION < 0x5008008) || ( (PERL_BCDVERSION >= 0x5009000) && (PERL_BCDVERSION < 0x5009003) )
++#define DPPP_SVPV_NOLEN_LP_ARG &PL_na
++#else
++#define DPPP_SVPV_NOLEN_LP_ARG 0
++#endif
++#ifndef SvPV_const
++#define SvPV_const(sv, lp) SvPV_flags_const(sv, lp, SV_GMAGIC)
++#endif
++#ifndef SvPV_mutable
++#define SvPV_mutable(sv, lp) SvPV_flags_mutable(sv, lp, SV_GMAGIC)
++#endif
++#ifndef SvPV_flags
++#define SvPV_flags(sv, lp, flags) \
++((SvFLAGS(sv) & (SVf_POK)) == SVf_POK \
++? ((lp = SvCUR(sv)), SvPVX(sv)) : sv_2pv_flags(sv, &lp, flags))
++#endif
++#ifndef SvPV_flags_const
++#define SvPV_flags_const(sv, lp, flags) \
++((SvFLAGS(sv) & (SVf_POK)) == SVf_POK \
++? ((lp = SvCUR(sv)), SvPVX_const(sv)) : \
++(const char*) sv_2pv_flags(sv, &lp, flags|SV_CONST_RETURN))
++#endif
++#ifndef SvPV_flags_const_nolen
++#define SvPV_flags_const_nolen(sv, flags) \
++((SvFLAGS(sv) & (SVf_POK)) == SVf_POK \
++? SvPVX_const(sv) : \
++(const char*) sv_2pv_flags(sv, DPPP_SVPV_NOLEN_LP_ARG, flags|SV_CONST_RETURN))
++#endif
++#ifndef SvPV_flags_mutable
++#define SvPV_flags_mutable(sv, lp, flags) \
++((SvFLAGS(sv) & (SVf_POK)) == SVf_POK \
++? ((lp = SvCUR(sv)), SvPVX_mutable(sv)) : \
++sv_2pv_flags(sv, &lp, flags|SV_MUTABLE_RETURN))
++#endif
++#ifndef SvPV_force
++#define SvPV_force(sv, lp) SvPV_force_flags(sv, lp, SV_GMAGIC)
++#endif
++#ifndef SvPV_force_nolen
++#define SvPV_force_nolen(sv) SvPV_force_flags_nolen(sv, SV_GMAGIC)
++#endif
++#ifndef SvPV_force_mutable
++#define SvPV_force_mutable(sv, lp) SvPV_force_flags_mutable(sv, lp, SV_GMAGIC)
++#endif
++#ifndef SvPV_force_nomg
++#define SvPV_force_nomg(sv, lp) SvPV_force_flags(sv, lp, 0)
++#endif
++#ifndef SvPV_force_nomg_nolen
++#define SvPV_force_nomg_nolen(sv) SvPV_force_flags_nolen(sv, 0)
++#endif
++#ifndef SvPV_force_flags
++#define SvPV_force_flags(sv, lp, flags) \
++((SvFLAGS(sv) & (SVf_POK|SVf_THINKFIRST)) == SVf_POK \
++? ((lp = SvCUR(sv)), SvPVX(sv)) : sv_pvn_force_flags(sv, &lp, flags))
++#endif
++#ifndef SvPV_force_flags_nolen
++#define SvPV_force_flags_nolen(sv, flags) \
++((SvFLAGS(sv) & (SVf_POK|SVf_THINKFIRST)) == SVf_POK \
++? SvPVX(sv) : sv_pvn_force_flags(sv, DPPP_SVPV_NOLEN_LP_ARG, flags))
++#endif
++#ifndef SvPV_force_flags_mutable
++#define SvPV_force_flags_mutable(sv, lp, flags) \
++((SvFLAGS(sv) & (SVf_POK|SVf_THINKFIRST)) == SVf_POK \
++? ((lp = SvCUR(sv)), SvPVX_mutable(sv)) \
++: sv_pvn_force_flags(sv, &lp, flags|SV_MUTABLE_RETURN))
++#endif
++#ifndef SvPV_nolen
++#define SvPV_nolen(sv) \
++((SvFLAGS(sv) & (SVf_POK)) == SVf_POK \
++? SvPVX(sv) : sv_2pv_flags(sv, DPPP_SVPV_NOLEN_LP_ARG, SV_GMAGIC))
++#endif
++#ifndef SvPV_nolen_const
++#define SvPV_nolen_const(sv) \
++((SvFLAGS(sv) & (SVf_POK)) == SVf_POK \
++? SvPVX_const(sv) : sv_2pv_flags(sv, DPPP_SVPV_NOLEN_LP_ARG, SV_GMAGIC|SV_CONST_RETURN))
++#endif
++#ifndef SvPV_nomg
++#define SvPV_nomg(sv, lp) SvPV_flags(sv, lp, 0)
++#endif
++#ifndef SvPV_nomg_const
++#define SvPV_nomg_const(sv, lp) SvPV_flags_const(sv, lp, 0)
++#endif
++#ifndef SvPV_nomg_const_nolen
++#define SvPV_nomg_const_nolen(sv) SvPV_flags_const_nolen(sv, 0)
++#endif
++#ifndef SvMAGIC_set
++#define SvMAGIC_set(sv, val) \
++STMT_START { assert(SvTYPE(sv) >= SVt_PVMG); \
++(((XPVMG*) SvANY(sv))->xmg_magic = (val)); } STMT_END
++#endif
++#if (PERL_BCDVERSION < 0x5009003)
++#ifndef SvPVX_const
++#define SvPVX_const(sv) ((const char*) (0 + SvPVX(sv)))
++#endif
++#ifndef SvPVX_mutable
++#define SvPVX_mutable(sv) (0 + SvPVX(sv))
++#endif
++#ifndef SvRV_set
++#define SvRV_set(sv, val) \
++STMT_START { assert(SvTYPE(sv) >= SVt_RV); \
++(((XRV*) SvANY(sv))->xrv_rv = (val)); } STMT_END
++#endif
++#else
++#ifndef SvPVX_const
++#define SvPVX_const(sv) ((const char*)((sv)->sv_u.svu_pv))
++#endif
++#ifndef SvPVX_mutable
++#define SvPVX_mutable(sv) ((sv)->sv_u.svu_pv)
++#endif
++#ifndef SvRV_set
++#define SvRV_set(sv, val) \
++STMT_START { assert(SvTYPE(sv) >= SVt_RV); \
++((sv)->sv_u.svu_rv = (val)); } STMT_END
++#endif
++#endif
++#ifndef SvSTASH_set
++#define SvSTASH_set(sv, val) \
++STMT_START { assert(SvTYPE(sv) >= SVt_PVMG); \
++(((XPVMG*) SvANY(sv))->xmg_stash = (val)); } STMT_END
++#endif
++#if (PERL_BCDVERSION < 0x5004000)
++#ifndef SvUV_set
++#define SvUV_set(sv, val) \
++STMT_START { assert(SvTYPE(sv) == SVt_IV || SvTYPE(sv) >= SVt_PVIV); \
++(((XPVIV*) SvANY(sv))->xiv_iv = (IV) (val)); } STMT_END
++#endif
++#else
++#ifndef SvUV_set
++#define SvUV_set(sv, val) \
++STMT_START { assert(SvTYPE(sv) == SVt_IV || SvTYPE(sv) >= SVt_PVIV); \
++(((XPVUV*) SvANY(sv))->xuv_uv = (val)); } STMT_END
++#endif
++#endif
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(vnewSVpvf)
++#if defined(NEED_vnewSVpvf)
++static SV * DPPP_(my_vnewSVpvf)(pTHX_ const char * pat, va_list * args);
++static
++#else
++extern SV * DPPP_(my_vnewSVpvf)(pTHX_ const char * pat, va_list * args);
++#endif
++#ifdef vnewSVpvf
++#undef vnewSVpvf
++#endif
++#define vnewSVpvf(a,b) DPPP_(my_vnewSVpvf)(aTHX_ a,b)
++#define Perl_vnewSVpvf DPPP_(my_vnewSVpvf)
++#if defined(NEED_vnewSVpvf) || defined(NEED_vnewSVpvf_GLOBAL)
++SV *
++DPPP_(my_vnewSVpvf)(pTHX_ const char *pat, va_list *args)
++{
++register SV *sv = newSV(0);
++sv_vsetpvfn(sv, pat, strlen(pat), args, Null(SV**), 0, Null(bool*));
++return sv;
++}
++#endif
++#endif
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(sv_vcatpvf)
++#define sv_vcatpvf(sv, pat, args) sv_vcatpvfn(sv, pat, strlen(pat), args, Null(SV**), 0, Null(bool*))
++#endif
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(sv_vsetpvf)
++#define sv_vsetpvf(sv, pat, args) sv_vsetpvfn(sv, pat, strlen(pat), args, Null(SV**), 0, Null(bool*))
++#endif
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(sv_catpvf_mg)
++#if defined(NEED_sv_catpvf_mg)
++static void DPPP_(my_sv_catpvf_mg)(pTHX_ SV * sv, const char * pat, ...);
++static
++#else
++extern void DPPP_(my_sv_catpvf_mg)(pTHX_ SV * sv, const char * pat, ...);
++#endif
++#define Perl_sv_catpvf_mg DPPP_(my_sv_catpvf_mg)
++#if defined(NEED_sv_catpvf_mg) || defined(NEED_sv_catpvf_mg_GLOBAL)
++void
++DPPP_(my_sv_catpvf_mg)(pTHX_ SV *sv, const char *pat, ...)
++{
++va_list args;
++va_start(args, pat);
++sv_vcatpvfn(sv, pat, strlen(pat), &args, Null(SV**), 0, Null(bool*));
++SvSETMAGIC(sv);
++va_end(args);
++}
++#endif
++#endif
++#ifdef PERL_IMPLICIT_CONTEXT
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(sv_catpvf_mg_nocontext)
++#if defined(NEED_sv_catpvf_mg_nocontext)
++static void DPPP_(my_sv_catpvf_mg_nocontext)(SV * sv, const char * pat, ...);
++static
++#else
++extern void DPPP_(my_sv_catpvf_mg_nocontext)(SV * sv, const char * pat, ...);
++#endif
++#define sv_catpvf_mg_nocontext DPPP_(my_sv_catpvf_mg_nocontext)
++#define Perl_sv_catpvf_mg_nocontext DPPP_(my_sv_catpvf_mg_nocontext)
++#if defined(NEED_sv_catpvf_mg_nocontext) || defined(NEED_sv_catpvf_mg_nocontext_GLOBAL)
++void
++DPPP_(my_sv_catpvf_mg_nocontext)(SV *sv, const char *pat, ...)
++{
++dTHX;
++va_list args;
++va_start(args, pat);
++sv_vcatpvfn(sv, pat, strlen(pat), &args, Null(SV**), 0, Null(bool*));
++SvSETMAGIC(sv);
++va_end(args);
++}
++#endif
++#endif
++#endif
++#ifndef sv_catpvf_mg
++#ifdef PERL_IMPLICIT_CONTEXT
++#define sv_catpvf_mg Perl_sv_catpvf_mg_nocontext
++#else
++#define sv_catpvf_mg Perl_sv_catpvf_mg
++#endif
++#endif
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(sv_vcatpvf_mg)
++#define sv_vcatpvf_mg(sv, pat, args) \
++STMT_START { \
++sv_vcatpvfn(sv, pat, strlen(pat), args, Null(SV**), 0, Null(bool*)); \
++SvSETMAGIC(sv); \
++} STMT_END
++#endif
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(sv_setpvf_mg)
++#if defined(NEED_sv_setpvf_mg)
++static void DPPP_(my_sv_setpvf_mg)(pTHX_ SV * sv, const char * pat, ...);
++static
++#else
++extern void DPPP_(my_sv_setpvf_mg)(pTHX_ SV * sv, const char * pat, ...);
++#endif
++#define Perl_sv_setpvf_mg DPPP_(my_sv_setpvf_mg)
++#if defined(NEED_sv_setpvf_mg) || defined(NEED_sv_setpvf_mg_GLOBAL)
++void
++DPPP_(my_sv_setpvf_mg)(pTHX_ SV *sv, const char *pat, ...)
++{
++va_list args;
++va_start(args, pat);
++sv_vsetpvfn(sv, pat, strlen(pat), &args, Null(SV**), 0, Null(bool*));
++SvSETMAGIC(sv);
++va_end(args);
++}
++#endif
++#endif
++#ifdef PERL_IMPLICIT_CONTEXT
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(sv_setpvf_mg_nocontext)
++#if defined(NEED_sv_setpvf_mg_nocontext)
++static void DPPP_(my_sv_setpvf_mg_nocontext)(SV * sv, const char * pat, ...);
++static
++#else
++extern void DPPP_(my_sv_setpvf_mg_nocontext)(SV * sv, const char * pat, ...);
++#endif
++#define sv_setpvf_mg_nocontext DPPP_(my_sv_setpvf_mg_nocontext)
++#define Perl_sv_setpvf_mg_nocontext DPPP_(my_sv_setpvf_mg_nocontext)
++#if defined(NEED_sv_setpvf_mg_nocontext) || defined(NEED_sv_setpvf_mg_nocontext_GLOBAL)
++void
++DPPP_(my_sv_setpvf_mg_nocontext)(SV *sv, const char *pat, ...)
++{
++dTHX;
++va_list args;
++va_start(args, pat);
++sv_vsetpvfn(sv, pat, strlen(pat), &args, Null(SV**), 0, Null(bool*));
++SvSETMAGIC(sv);
++va_end(args);
++}
++#endif
++#endif
++#endif
++#ifndef sv_setpvf_mg
++#ifdef PERL_IMPLICIT_CONTEXT
++#define sv_setpvf_mg Perl_sv_setpvf_mg_nocontext
++#else
++#define sv_setpvf_mg Perl_sv_setpvf_mg
++#endif
++#endif
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(sv_vsetpvf_mg)
++#define sv_vsetpvf_mg(sv, pat, args) \
++STMT_START { \
++sv_vsetpvfn(sv, pat, strlen(pat), args, Null(SV**), 0, Null(bool*)); \
++SvSETMAGIC(sv); \
++} STMT_END
++#endif
++#ifndef newSVpvn_share
++#if defined(NEED_newSVpvn_share)
++static SV * DPPP_(my_newSVpvn_share)(pTHX_ const char *src, I32 len, U32 hash);
++static
++#else
++extern SV * DPPP_(my_newSVpvn_share)(pTHX_ const char *src, I32 len, U32 hash);
++#endif
++#ifdef newSVpvn_share
++#undef newSVpvn_share
++#endif
++#define newSVpvn_share(a,b,c) DPPP_(my_newSVpvn_share)(aTHX_ a,b,c)
++#define Perl_newSVpvn_share DPPP_(my_newSVpvn_share)
++#if defined(NEED_newSVpvn_share) || defined(NEED_newSVpvn_share_GLOBAL)
++SV *
++DPPP_(my_newSVpvn_share)(pTHX_ const char *src, I32 len, U32 hash)
++{
++SV *sv;
++if (len < 0)
++len = -len;
++if (!hash)
++PERL_HASH(hash, (char*) src, len);
++sv = newSVpvn((char *) src, len);
++sv_upgrade(sv, SVt_PVIV);
++SvIVX(sv) = hash;
++SvREADONLY_on(sv);
++SvPOK_on(sv);
++return sv;
++}
++#endif
++#endif
++#ifndef SvSHARED_HASH
++#define SvSHARED_HASH(sv) (0 + SvUVX(sv))
++#endif
++#ifndef WARN_ALL
++#define WARN_ALL 0
++#endif
++#ifndef WARN_CLOSURE
++#define WARN_CLOSURE 1
++#endif
++#ifndef WARN_DEPRECATED
++#define WARN_DEPRECATED 2
++#endif
++#ifndef WARN_EXITING
++#define WARN_EXITING 3
++#endif
++#ifndef WARN_GLOB
++#define WARN_GLOB 4
++#endif
++#ifndef WARN_IO
++#define WARN_IO 5
++#endif
++#ifndef WARN_CLOSED
++#define WARN_CLOSED 6
++#endif
++#ifndef WARN_EXEC
++#define WARN_EXEC 7
++#endif
++#ifndef WARN_LAYER
++#define WARN_LAYER 8
++#endif
++#ifndef WARN_NEWLINE
++#define WARN_NEWLINE 9
++#endif
++#ifndef WARN_PIPE
++#define WARN_PIPE 10
++#endif
++#ifndef WARN_UNOPENED
++#define WARN_UNOPENED 11
++#endif
++#ifndef WARN_MISC
++#define WARN_MISC 12
++#endif
++#ifndef WARN_NUMERIC
++#define WARN_NUMERIC 13
++#endif
++#ifndef WARN_ONCE
++#define WARN_ONCE 14
++#endif
++#ifndef WARN_OVERFLOW
++#define WARN_OVERFLOW 15
++#endif
++#ifndef WARN_PACK
++#define WARN_PACK 16
++#endif
++#ifndef WARN_PORTABLE
++#define WARN_PORTABLE 17
++#endif
++#ifndef WARN_RECURSION
++#define WARN_RECURSION 18
++#endif
++#ifndef WARN_REDEFINE
++#define WARN_REDEFINE 19
++#endif
++#ifndef WARN_REGEXP
++#define WARN_REGEXP 20
++#endif
++#ifndef WARN_SEVERE
++#define WARN_SEVERE 21
++#endif
++#ifndef WARN_DEBUGGING
++#define WARN_DEBUGGING 22
++#endif
++#ifndef WARN_INPLACE
++#define WARN_INPLACE 23
++#endif
++#ifndef WARN_INTERNAL
++#define WARN_INTERNAL 24
++#endif
++#ifndef WARN_MALLOC
++#define WARN_MALLOC 25
++#endif
++#ifndef WARN_SIGNAL
++#define WARN_SIGNAL 26
++#endif
++#ifndef WARN_SUBSTR
++#define WARN_SUBSTR 27
++#endif
++#ifndef WARN_SYNTAX
++#define WARN_SYNTAX 28
++#endif
++#ifndef WARN_AMBIGUOUS
++#define WARN_AMBIGUOUS 29
++#endif
++#ifndef WARN_BAREWORD
++#define WARN_BAREWORD 30
++#endif
++#ifndef WARN_DIGIT
++#define WARN_DIGIT 31
++#endif
++#ifndef WARN_PARENTHESIS
++#define WARN_PARENTHESIS 32
++#endif
++#ifndef WARN_PRECEDENCE
++#define WARN_PRECEDENCE 33
++#endif
++#ifndef WARN_PRINTF
++#define WARN_PRINTF 34
++#endif
++#ifndef WARN_PROTOTYPE
++#define WARN_PROTOTYPE 35
++#endif
++#ifndef WARN_QW
++#define WARN_QW 36
++#endif
++#ifndef WARN_RESERVED
++#define WARN_RESERVED 37
++#endif
++#ifndef WARN_SEMICOLON
++#define WARN_SEMICOLON 38
++#endif
++#ifndef WARN_TAINT
++#define WARN_TAINT 39
++#endif
++#ifndef WARN_THREADS
++#define WARN_THREADS 40
++#endif
++#ifndef WARN_UNINITIALIZED
++#define WARN_UNINITIALIZED 41
++#endif
++#ifndef WARN_UNPACK
++#define WARN_UNPACK 42
++#endif
++#ifndef WARN_UNTIE
++#define WARN_UNTIE 43
++#endif
++#ifndef WARN_UTF8
++#define WARN_UTF8 44
++#endif
++#ifndef WARN_VOID
++#define WARN_VOID 45
++#endif
++#ifndef WARN_ASSERTIONS
++#define WARN_ASSERTIONS 46
++#endif
++#ifndef packWARN
++#define packWARN(a) (a)
++#endif
++#ifndef ckWARN
++#ifdef G_WARN_ON
++#define ckWARN(a) (PL_dowarn & G_WARN_ON)
++#else
++#define ckWARN(a) PL_dowarn
++#endif
++#endif
++#if (PERL_BCDVERSION >= 0x5004000) && !defined(warner)
++#if defined(NEED_warner)
++static void DPPP_(my_warner)(U32 err, const char *pat, ...);
++static
++#else
++extern void DPPP_(my_warner)(U32 err, const char *pat, ...);
++#endif
++#define Perl_warner DPPP_(my_warner)
++#if defined(NEED_warner) || defined(NEED_warner_GLOBAL)
++void
++DPPP_(my_warner)(U32 err, const char *pat, ...)
++{
++SV *sv;
++va_list args;
++PERL_UNUSED_ARG(err);
++va_start(args, pat);
++sv = vnewSVpvf(pat, &args);
++va_end(args);
++sv_2mortal(sv);
++warn("%s", SvPV_nolen(sv));
++}
++#define warner Perl_warner
++#define Perl_warner_nocontext Perl_warner
++#endif
++#endif
++#ifndef STR_WITH_LEN
++#define STR_WITH_LEN(s) (s ""), (sizeof(s)-1)
++#endif
++#ifndef newSVpvs
++#define newSVpvs(str) newSVpvn(str "", sizeof(str) - 1)
++#endif
++#ifndef newSVpvs_flags
++#define newSVpvs_flags(str, flags) newSVpvn_flags(str "", sizeof(str) - 1, flags)
++#endif
++#ifndef sv_catpvs
++#define sv_catpvs(sv, str) sv_catpvn(sv, str "", sizeof(str) - 1)
++#endif
++#ifndef sv_setpvs
++#define sv_setpvs(sv, str) sv_setpvn(sv, str "", sizeof(str) - 1)
++#endif
++#ifndef hv_fetchs
++#define hv_fetchs(hv, key, lval) hv_fetch(hv, key "", sizeof(key) - 1, lval)
++#endif
++#ifndef hv_stores
++#define hv_stores(hv, key, val) hv_store(hv, key "", sizeof(key) - 1, val, 0)
++#endif
++#ifndef SvGETMAGIC
++#define SvGETMAGIC(x) STMT_START { if (SvGMAGICAL(x)) mg_get(x); } STMT_END
++#endif
++#ifndef PERL_MAGIC_sv
++#define PERL_MAGIC_sv '\0'
++#endif
++#ifndef PERL_MAGIC_overload
++#define PERL_MAGIC_overload 'A'
++#endif
++#ifndef PERL_MAGIC_overload_elem
++#define PERL_MAGIC_overload_elem 'a'
++#endif
++#ifndef PERL_MAGIC_overload_table
++#define PERL_MAGIC_overload_table 'c'
++#endif
++#ifndef PERL_MAGIC_bm
++#define PERL_MAGIC_bm 'B'
++#endif
++#ifndef PERL_MAGIC_regdata
++#define PERL_MAGIC_regdata 'D'
++#endif
++#ifndef PERL_MAGIC_regdatum
++#define PERL_MAGIC_regdatum 'd'
++#endif
++#ifndef PERL_MAGIC_env
++#define PERL_MAGIC_env 'E'
++#endif
++#ifndef PERL_MAGIC_envelem
++#define PERL_MAGIC_envelem 'e'
++#endif
++#ifndef PERL_MAGIC_fm
++#define PERL_MAGIC_fm 'f'
++#endif
++#ifndef PERL_MAGIC_regex_global
++#define PERL_MAGIC_regex_global 'g'
++#endif
++#ifndef PERL_MAGIC_isa
++#define PERL_MAGIC_isa 'I'
++#endif
++#ifndef PERL_MAGIC_isaelem
++#define PERL_MAGIC_isaelem 'i'
++#endif
++#ifndef PERL_MAGIC_nkeys
++#define PERL_MAGIC_nkeys 'k'
++#endif
++#ifndef PERL_MAGIC_dbfile
++#define PERL_MAGIC_dbfile 'L'
++#endif
++#ifndef PERL_MAGIC_dbline
++#define PERL_MAGIC_dbline 'l'
++#endif
++#ifndef PERL_MAGIC_mutex
++#define PERL_MAGIC_mutex 'm'
++#endif
++#ifndef PERL_MAGIC_shared
++#define PERL_MAGIC_shared 'N'
++#endif
++#ifndef PERL_MAGIC_shared_scalar
++#define PERL_MAGIC_shared_scalar 'n'
++#endif
++#ifndef PERL_MAGIC_collxfrm
++#define PERL_MAGIC_collxfrm 'o'
++#endif
++#ifndef PERL_MAGIC_tied
++#define PERL_MAGIC_tied 'P'
++#endif
++#ifndef PERL_MAGIC_tiedelem
++#define PERL_MAGIC_tiedelem 'p'
++#endif
++#ifndef PERL_MAGIC_tiedscalar
++#define PERL_MAGIC_tiedscalar 'q'
++#endif
++#ifndef PERL_MAGIC_qr
++#define PERL_MAGIC_qr 'r'
++#endif
++#ifndef PERL_MAGIC_sig
++#define PERL_MAGIC_sig 'S'
++#endif
++#ifndef PERL_MAGIC_sigelem
++#define PERL_MAGIC_sigelem 's'
++#endif
++#ifndef PERL_MAGIC_taint
++#define PERL_MAGIC_taint 't'
++#endif
++#ifndef PERL_MAGIC_uvar
++#define PERL_MAGIC_uvar 'U'
++#endif
++#ifndef PERL_MAGIC_uvar_elem
++#define PERL_MAGIC_uvar_elem 'u'
++#endif
++#ifndef PERL_MAGIC_vstring
++#define PERL_MAGIC_vstring 'V'
++#endif
++#ifndef PERL_MAGIC_vec
++#define PERL_MAGIC_vec 'v'
++#endif
++#ifndef PERL_MAGIC_utf8
++#define PERL_MAGIC_utf8 'w'
++#endif
++#ifndef PERL_MAGIC_substr
++#define PERL_MAGIC_substr 'x'
++#endif
++#ifndef PERL_MAGIC_defelem
++#define PERL_MAGIC_defelem 'y'
++#endif
++#ifndef PERL_MAGIC_glob
++#define PERL_MAGIC_glob '*'
++#endif
++#ifndef PERL_MAGIC_arylen
++#define PERL_MAGIC_arylen '#'
++#endif
++#ifndef PERL_MAGIC_pos
++#define PERL_MAGIC_pos '.'
++#endif
++#ifndef PERL_MAGIC_backref
++#define PERL_MAGIC_backref '<'
++#endif
++#ifndef PERL_MAGIC_ext
++#define PERL_MAGIC_ext '~'
++#endif
++#ifndef sv_catpvn_nomg
++#define sv_catpvn_nomg sv_catpvn
++#endif
++#ifndef sv_catsv_nomg
++#define sv_catsv_nomg sv_catsv
++#endif
++#ifndef sv_setsv_nomg
++#define sv_setsv_nomg sv_setsv
++#endif
++#ifndef sv_pvn_nomg
++#define sv_pvn_nomg sv_pvn
++#endif
++#ifndef SvIV_nomg
++#define SvIV_nomg SvIV
++#endif
++#ifndef SvUV_nomg
++#define SvUV_nomg SvUV
++#endif
++#ifndef sv_catpv_mg
++#define sv_catpv_mg(sv, ptr) \
++STMT_START { \
++SV *TeMpSv = sv; \
++sv_catpv(TeMpSv,ptr); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef sv_catpvn_mg
++#define sv_catpvn_mg(sv, ptr, len) \
++STMT_START { \
++SV *TeMpSv = sv; \
++sv_catpvn(TeMpSv,ptr,len); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef sv_catsv_mg
++#define sv_catsv_mg(dsv, ssv) \
++STMT_START { \
++SV *TeMpSv = dsv; \
++sv_catsv(TeMpSv,ssv); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef sv_setiv_mg
++#define sv_setiv_mg(sv, i) \
++STMT_START { \
++SV *TeMpSv = sv; \
++sv_setiv(TeMpSv,i); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef sv_setnv_mg
++#define sv_setnv_mg(sv, num) \
++STMT_START { \
++SV *TeMpSv = sv; \
++sv_setnv(TeMpSv,num); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef sv_setpv_mg
++#define sv_setpv_mg(sv, ptr) \
++STMT_START { \
++SV *TeMpSv = sv; \
++sv_setpv(TeMpSv,ptr); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef sv_setpvn_mg
++#define sv_setpvn_mg(sv, ptr, len) \
++STMT_START { \
++SV *TeMpSv = sv; \
++sv_setpvn(TeMpSv,ptr,len); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef sv_setsv_mg
++#define sv_setsv_mg(dsv, ssv) \
++STMT_START { \
++SV *TeMpSv = dsv; \
++sv_setsv(TeMpSv,ssv); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef sv_setuv_mg
++#define sv_setuv_mg(sv, i) \
++STMT_START { \
++SV *TeMpSv = sv; \
++sv_setuv(TeMpSv,i); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef sv_usepvn_mg
++#define sv_usepvn_mg(sv, ptr, len) \
++STMT_START { \
++SV *TeMpSv = sv; \
++sv_usepvn(TeMpSv,ptr,len); \
++SvSETMAGIC(TeMpSv); \
++} STMT_END
++#endif
++#ifndef SvVSTRING_mg
++#define SvVSTRING_mg(sv) (SvMAGICAL(sv) ? mg_find(sv, PERL_MAGIC_vstring) : NULL)
++#endif
++#if (PERL_BCDVERSION < 0x5004000)
++#elif (PERL_BCDVERSION < 0x5008000)
++#define sv_magic_portable(sv, obj, how, name, namlen) \
++STMT_START { \
++SV *SvMp_sv = (sv); \
++char *SvMp_name = (char *) (name); \
++I32 SvMp_namlen = (namlen); \
++if (SvMp_name && SvMp_namlen == 0) \
++{ \
++MAGIC *mg; \
++sv_magic(SvMp_sv, obj, how, 0, 0); \
++mg = SvMAGIC(SvMp_sv); \
++mg->mg_len = -42;  \
++mg->mg_ptr = SvMp_name; \
++} \
++else \
++{ \
++sv_magic(SvMp_sv, obj, how, SvMp_name, SvMp_namlen); \
++} \
++} STMT_END
++#else
++#define sv_magic_portable(a, b, c, d, e) sv_magic(a, b, c, d, e)
++#endif
++#ifdef USE_ITHREADS
++#ifndef CopFILE
++#define CopFILE(c) ((c)->cop_file)
++#endif
++#ifndef CopFILEGV
++#define CopFILEGV(c) (CopFILE(c) ? gv_fetchfile(CopFILE(c)) : Nullgv)
++#endif
++#ifndef CopFILE_set
++#define CopFILE_set(c,pv) ((c)->cop_file = savepv(pv))
++#endif
++#ifndef CopFILESV
++#define CopFILESV(c) (CopFILE(c) ? GvSV(gv_fetchfile(CopFILE(c))) : Nullsv)
++#endif
++#ifndef CopFILEAV
++#define CopFILEAV(c) (CopFILE(c) ? GvAV(gv_fetchfile(CopFILE(c))) : Nullav)
++#endif
++#ifndef CopSTASHPV
++#define CopSTASHPV(c) ((c)->cop_stashpv)
++#endif
++#ifndef CopSTASHPV_set
++#define CopSTASHPV_set(c,pv) ((c)->cop_stashpv = ((pv) ? savepv(pv) : Nullch))
++#endif
++#ifndef CopSTASH
++#define CopSTASH(c) (CopSTASHPV(c) ? gv_stashpv(CopSTASHPV(c),GV_ADD) : Nullhv)
++#endif
++#ifndef CopSTASH_set
++#define CopSTASH_set(c,hv) CopSTASHPV_set(c, (hv) ? HvNAME(hv) : Nullch)
++#endif
++#ifndef CopSTASH_eq
++#define CopSTASH_eq(c,hv) ((hv) && (CopSTASHPV(c) == HvNAME(hv) \
++|| (CopSTASHPV(c) && HvNAME(hv) \
++&& strEQ(CopSTASHPV(c), HvNAME(hv)))))
++#endif
++#else
++#ifndef CopFILEGV
++#define CopFILEGV(c) ((c)->cop_filegv)
++#endif
++#ifndef CopFILEGV_set
++#define CopFILEGV_set(c,gv) ((c)->cop_filegv = (GV*)SvREFCNT_inc(gv))
++#endif
++#ifndef CopFILE_set
++#define CopFILE_set(c,pv) CopFILEGV_set((c), gv_fetchfile(pv))
++#endif
++#ifndef CopFILESV
++#define CopFILESV(c) (CopFILEGV(c) ? GvSV(CopFILEGV(c)) : Nullsv)
++#endif
++#ifndef CopFILEAV
++#define CopFILEAV(c) (CopFILEGV(c) ? GvAV(CopFILEGV(c)) : Nullav)
++#endif
++#ifndef CopFILE
++#define CopFILE(c) (CopFILESV(c) ? SvPVX(CopFILESV(c)) : Nullch)
++#endif
++#ifndef CopSTASH
++#define CopSTASH(c) ((c)->cop_stash)
++#endif
++#ifndef CopSTASH_set
++#define CopSTASH_set(c,hv) ((c)->cop_stash = (hv))
++#endif
++#ifndef CopSTASHPV
++#define CopSTASHPV(c) (CopSTASH(c) ? HvNAME(CopSTASH(c)) : Nullch)
++#endif
++#ifndef CopSTASHPV_set
++#define CopSTASHPV_set(c,pv) CopSTASH_set((c), gv_stashpv(pv,GV_ADD))
++#endif
++#ifndef CopSTASH_eq
++#define CopSTASH_eq(c,hv) (CopSTASH(c) == (hv))
++#endif
++#endif
++#ifndef IN_PERL_COMPILETIME
++#define IN_PERL_COMPILETIME (PL_curcop == &PL_compiling)
++#endif
++#ifndef IN_LOCALE_RUNTIME
++#define IN_LOCALE_RUNTIME (PL_curcop->op_private & HINT_LOCALE)
++#endif
++#ifndef IN_LOCALE_COMPILETIME
++#define IN_LOCALE_COMPILETIME (PL_hints & HINT_LOCALE)
++#endif
++#ifndef IN_LOCALE
++#define IN_LOCALE (IN_PERL_COMPILETIME ? IN_LOCALE_COMPILETIME : IN_LOCALE_RUNTIME)
++#endif
++#ifndef IS_NUMBER_IN_UV
++#define IS_NUMBER_IN_UV 0x01
++#endif
++#ifndef IS_NUMBER_GREATER_THAN_UV_MAX
++#define IS_NUMBER_GREATER_THAN_UV_MAX 0x02
++#endif
++#ifndef IS_NUMBER_NOT_INT
++#define IS_NUMBER_NOT_INT 0x04
++#endif
++#ifndef IS_NUMBER_NEG
++#define IS_NUMBER_NEG 0x08
++#endif
++#ifndef IS_NUMBER_INFINITY
++#define IS_NUMBER_INFINITY 0x10
++#endif
++#ifndef IS_NUMBER_NAN
++#define IS_NUMBER_NAN 0x20
++#endif
++#ifndef GROK_NUMERIC_RADIX
++#define GROK_NUMERIC_RADIX(sp, send) grok_numeric_radix(sp, send)
++#endif
++#ifndef PERL_SCAN_GREATER_THAN_UV_MAX
++#define PERL_SCAN_GREATER_THAN_UV_MAX 0x02
++#endif
++#ifndef PERL_SCAN_SILENT_ILLDIGIT
++#define PERL_SCAN_SILENT_ILLDIGIT 0x04
++#endif
++#ifndef PERL_SCAN_ALLOW_UNDERSCORES
++#define PERL_SCAN_ALLOW_UNDERSCORES 0x01
++#endif
++#ifndef PERL_SCAN_DISALLOW_PREFIX
++#define PERL_SCAN_DISALLOW_PREFIX 0x02
++#endif
++#ifndef grok_numeric_radix
++#if defined(NEED_grok_numeric_radix)
++static bool DPPP_(my_grok_numeric_radix)(pTHX_ const char ** sp, const char * send);
++static
++#else
++extern bool DPPP_(my_grok_numeric_radix)(pTHX_ const char ** sp, const char * send);
++#endif
++#ifdef grok_numeric_radix
++#undef grok_numeric_radix
++#endif
++#define grok_numeric_radix(a,b) DPPP_(my_grok_numeric_radix)(aTHX_ a,b)
++#define Perl_grok_numeric_radix DPPP_(my_grok_numeric_radix)
++#if defined(NEED_grok_numeric_radix) || defined(NEED_grok_numeric_radix_GLOBAL)
++bool
++DPPP_(my_grok_numeric_radix)(pTHX_ const char **sp, const char *send)
++{
++#ifdef USE_LOCALE_NUMERIC
++#ifdef PL_numeric_radix_sv
++if (PL_numeric_radix_sv && IN_LOCALE) {
++STRLEN len;
++char* radix = SvPV(PL_numeric_radix_sv, len);
++if (*sp + len <= send && memEQ(*sp, radix, len)) {
++*sp += len;
++return TRUE;
++}
++}
++#else
++#include <locale.h>
++dTHR;
++struct lconv *lc = localeconv();
++char *radix = lc->decimal_point;
++if (radix && IN_LOCALE) {
++STRLEN len = strlen(radix);
++if (*sp + len <= send && memEQ(*sp, radix, len)) {
++*sp += len;
++return TRUE;
++}
++}
++#endif
++#endif
++if (*sp < send && **sp == '.') {
++++*sp;
++return TRUE;
++}
++return FALSE;
++}
++#endif
++#endif
++#ifndef grok_number
++#if defined(NEED_grok_number)
++static int DPPP_(my_grok_number)(pTHX_ const char * pv, STRLEN len, UV * valuep);
++static
++#else
++extern int DPPP_(my_grok_number)(pTHX_ const char * pv, STRLEN len, UV * valuep);
++#endif
++#ifdef grok_number
++#undef grok_number
++#endif
++#define grok_number(a,b,c) DPPP_(my_grok_number)(aTHX_ a,b,c)
++#define Perl_grok_number DPPP_(my_grok_number)
++#if defined(NEED_grok_number) || defined(NEED_grok_number_GLOBAL)
++int
++DPPP_(my_grok_number)(pTHX_ const char *pv, STRLEN len, UV *valuep)
++{
++const char *s = pv;
++const char *send = pv + len;
++const UV max_div_10 = UV_MAX / 10;
++const char max_mod_10 = UV_MAX % 10;
++int numtype = 0;
++int sawinf = 0;
++int sawnan = 0;
++while (s < send && isSPACE(*s))
++s++;
++if (s == send) {
++return 0;
++} else if (*s == '-') {
++s++;
++numtype = IS_NUMBER_NEG;
++}
++else if (*s == '+')
++s++;
++if (s == send)
++return 0;
++if (isDIGIT(*s)) {
++UV value = *s - '0';
++if (++s < send) {
++int digit = *s - '0';
++if (digit >= 0 && digit <= 9) {
++value = value * 10 + digit;
++if (++s < send) {
++digit = *s - '0';
++if (digit >= 0 && digit <= 9) {
++value = value * 10 + digit;
++if (++s < send) {
++digit = *s - '0';
++if (digit >= 0 && digit <= 9) {
++value = value * 10 + digit;
++if (++s < send) {
++digit = *s - '0';
++if (digit >= 0 && digit <= 9) {
++value = value * 10 + digit;
++if (++s < send) {
++digit = *s - '0';
++if (digit >= 0 && digit <= 9) {
++value = value * 10 + digit;
++if (++s < send) {
++digit = *s - '0';
++if (digit >= 0 && digit <= 9) {
++value = value * 10 + digit;
++if (++s < send) {
++digit = *s - '0';
++if (digit >= 0 && digit <= 9) {
++value = value * 10 + digit;
++if (++s < send) {
++digit = *s - '0';
++if (digit >= 0 && digit <= 9) {
++value = value * 10 + digit;
++if (++s < send) {
++digit = *s - '0';
++while (digit >= 0 && digit <= 9
++&& (value < max_div_10
++|| (value == max_div_10
++&& digit <= max_mod_10))) {
++value = value * 10 + digit;
++if (++s < send)
++digit = *s - '0';
++else
++break;
++}
++if (digit >= 0 && digit <= 9
++&& (s < send)) {
++do {
++s++;
++} while (s < send && isDIGIT(*s));
++numtype |=
++IS_NUMBER_GREATER_THAN_UV_MAX;
++goto skip_value;
++}
++}
++}
++}
++}
++}
++}
++}
++}
++}
++}
++}
++}
++}
++}
++}
++}
++}
++numtype |= IS_NUMBER_IN_UV;
++if (valuep)
++*valuep = value;
++skip_value:
++if (GROK_NUMERIC_RADIX(&s, send)) {
++numtype |= IS_NUMBER_NOT_INT;
++while (s < send && isDIGIT(*s))
++s++;
++}
++}
++else if (GROK_NUMERIC_RADIX(&s, send)) {
++numtype |= IS_NUMBER_NOT_INT | IS_NUMBER_IN_UV;
++if (s < send && isDIGIT(*s)) {
++do {
++s++;
++} while (s < send && isDIGIT(*s));
++if (valuep) {
++*valuep = 0;
++}
++}
++else
++return 0;
++} else if (*s == 'I' || *s == 'i') {
++s++; if (s == send || (*s != 'N' && *s != 'n')) return 0;
++s++; if (s == send || (*s != 'F' && *s != 'f')) return 0;
++s++; if (s < send && (*s == 'I' || *s == 'i')) {
++s++; if (s == send || (*s != 'N' && *s != 'n')) return 0;
++s++; if (s == send || (*s != 'I' && *s != 'i')) return 0;
++s++; if (s == send || (*s != 'T' && *s != 't')) return 0;
++s++; if (s == send || (*s != 'Y' && *s != 'y')) return 0;
++s++;
++}
++sawinf = 1;
++} else if (*s == 'N' || *s == 'n') {
++s++; if (s == send || (*s != 'A' && *s != 'a')) return 0;
++s++; if (s == send || (*s != 'N' && *s != 'n')) return 0;
++s++;
++sawnan = 1;
++} else
++return 0;
++if (sawinf) {
++numtype &= IS_NUMBER_NEG;
++numtype |= IS_NUMBER_INFINITY | IS_NUMBER_NOT_INT;
++} else if (sawnan) {
++numtype &= IS_NUMBER_NEG;
++numtype |= IS_NUMBER_NAN | IS_NUMBER_NOT_INT;
++} else if (s < send) {
++if (*s == 'e' || *s == 'E') {
++numtype &= IS_NUMBER_NEG;
++numtype |= IS_NUMBER_NOT_INT;
++s++;
++if (s < send && (*s == '-' || *s == '+'))
++s++;
++if (s < send && isDIGIT(*s)) {
++do {
++s++;
++} while (s < send && isDIGIT(*s));
++}
++else
++return 0;
++}
++}
++while (s < send && isSPACE(*s))
++s++;
++if (s >= send)
++return numtype;
++if (len == 10 && memEQ(pv, "0 but true", 10)) {
++if (valuep)
++*valuep = 0;
++return IS_NUMBER_IN_UV;
++}
++return 0;
++}
++#endif
++#endif
++#ifndef grok_bin
++#if defined(NEED_grok_bin)
++static UV DPPP_(my_grok_bin)(pTHX_ const char * start, STRLEN * len_p, I32 * flags, NV * result);
++static
++#else
++extern UV DPPP_(my_grok_bin)(pTHX_ const char * start, STRLEN * len_p, I32 * flags, NV * result);
++#endif
++#ifdef grok_bin
++#undef grok_bin
++#endif
++#define grok_bin(a,b,c,d) DPPP_(my_grok_bin)(aTHX_ a,b,c,d)
++#define Perl_grok_bin DPPP_(my_grok_bin)
++#if defined(NEED_grok_bin) || defined(NEED_grok_bin_GLOBAL)
++UV
++DPPP_(my_grok_bin)(pTHX_ const char *start, STRLEN *len_p, I32 *flags, NV *result)
++{
++const char *s = start;
++STRLEN len = *len_p;
++UV value = 0;
++NV value_nv = 0;
++const UV max_div_2 = UV_MAX / 2;
++bool allow_underscores = *flags & PERL_SCAN_ALLOW_UNDERSCORES;
++bool overflowed = FALSE;
++if (!(*flags & PERL_SCAN_DISALLOW_PREFIX)) {
++if (len >= 1) {
++if (s[0] == 'b') {
++s++;
++len--;
++}
++else if (len >= 2 && s[0] == '0' && s[1] == 'b') {
++s+=2;
++len-=2;
++}
++}
++}
++for (; len-- && *s; s++) {
++char bit = *s;
++if (bit == '0' || bit == '1') {
++redo:
++if (!overflowed) {
++if (value <= max_div_2) {
++value = (value << 1) | (bit - '0');
++continue;
++}
++warn("Integer overflow in binary number");
++overflowed = TRUE;
++value_nv = (NV) value;
++}
++value_nv *= 2.0;
++value_nv += (NV)(bit - '0');
++continue;
++}
++if (bit == '_' && len && allow_underscores && (bit = s[1])
++&& (bit == '0' || bit == '1'))
++{
++--len;
++++s;
++goto redo;
++}
++if (!(*flags & PERL_SCAN_SILENT_ILLDIGIT))
++warn("Illegal binary digit '%c' ignored", *s);
++break;
++}
++if ( ( overflowed && value_nv > 4294967295.0)
++#if UVSIZE > 4
++|| (!overflowed && value > 0xffffffff )
++#endif
++) {
++warn("Binary number > 0b11111111111111111111111111111111 non-portable");
++}
++*len_p = s - start;
++if (!overflowed) {
++*flags = 0;
++return value;
++}
++*flags = PERL_SCAN_GREATER_THAN_UV_MAX;
++if (result)
++*result = value_nv;
++return UV_MAX;
++}
++#endif
++#endif
++#ifndef grok_hex
++#if defined(NEED_grok_hex)
++static UV DPPP_(my_grok_hex)(pTHX_ const char * start, STRLEN * len_p, I32 * flags, NV * result);
++static
++#else
++extern UV DPPP_(my_grok_hex)(pTHX_ const char * start, STRLEN * len_p, I32 * flags, NV * result);
++#endif
++#ifdef grok_hex
++#undef grok_hex
++#endif
++#define grok_hex(a,b,c,d) DPPP_(my_grok_hex)(aTHX_ a,b,c,d)
++#define Perl_grok_hex DPPP_(my_grok_hex)
++#if defined(NEED_grok_hex) || defined(NEED_grok_hex_GLOBAL)
++UV
++DPPP_(my_grok_hex)(pTHX_ const char *start, STRLEN *len_p, I32 *flags, NV *result)
++{
++const char *s = start;
++STRLEN len = *len_p;
++UV value = 0;
++NV value_nv = 0;
++const UV max_div_16 = UV_MAX / 16;
++bool allow_underscores = *flags & PERL_SCAN_ALLOW_UNDERSCORES;
++bool overflowed = FALSE;
++const char *xdigit;
++if (!(*flags & PERL_SCAN_DISALLOW_PREFIX)) {
++if (len >= 1) {
++if (s[0] == 'x') {
++s++;
++len--;
++}
++else if (len >= 2 && s[0] == '0' && s[1] == 'x') {
++s+=2;
++len-=2;
++}
++}
++}
++for (; len-- && *s; s++) {
++xdigit = strchr((char *) PL_hexdigit, *s);
++if (xdigit) {
++redo:
++if (!overflowed) {
++if (value <= max_div_16) {
++value = (value << 4) | ((xdigit - PL_hexdigit) & 15);
++continue;
++}
++warn("Integer overflow in hexadecimal number");
++overflowed = TRUE;
++value_nv = (NV) value;
++}
++value_nv *= 16.0;
++value_nv += (NV)((xdigit - PL_hexdigit) & 15);
++continue;
++}
++if (*s == '_' && len && allow_underscores && s[1]
++&& (xdigit = strchr((char *) PL_hexdigit, s[1])))
++{
++--len;
++++s;
++goto redo;
++}
++if (!(*flags & PERL_SCAN_SILENT_ILLDIGIT))
++warn("Illegal hexadecimal digit '%c' ignored", *s);
++break;
++}
++if ( ( overflowed && value_nv > 4294967295.0)
++#if UVSIZE > 4
++|| (!overflowed && value > 0xffffffff )
++#endif
++) {
++warn("Hexadecimal number > 0xffffffff non-portable");
++}
++*len_p = s - start;
++if (!overflowed) {
++*flags = 0;
++return value;
++}
++*flags = PERL_SCAN_GREATER_THAN_UV_MAX;
++if (result)
++*result = value_nv;
++return UV_MAX;
++}
++#endif
++#endif
++#ifndef grok_oct
++#if defined(NEED_grok_oct)
++static UV DPPP_(my_grok_oct)(pTHX_ const char * start, STRLEN * len_p, I32 * flags, NV * result);
++static
++#else
++extern UV DPPP_(my_grok_oct)(pTHX_ const char * start, STRLEN * len_p, I32 * flags, NV * result);
++#endif
++#ifdef grok_oct
++#undef grok_oct
++#endif
++#define grok_oct(a,b,c,d) DPPP_(my_grok_oct)(aTHX_ a,b,c,d)
++#define Perl_grok_oct DPPP_(my_grok_oct)
++#if defined(NEED_grok_oct) || defined(NEED_grok_oct_GLOBAL)
++UV
++DPPP_(my_grok_oct)(pTHX_ const char *start, STRLEN *len_p, I32 *flags, NV *result)
++{
++const char *s = start;
++STRLEN len = *len_p;
++UV value = 0;
++NV value_nv = 0;
++const UV max_div_8 = UV_MAX / 8;
++bool allow_underscores = *flags & PERL_SCAN_ALLOW_UNDERSCORES;
++bool overflowed = FALSE;
++for (; len-- && *s; s++) {
++int digit = *s - '0';
++if (digit >= 0 && digit <= 7) {
++redo:
++if (!overflowed) {
++if (value <= max_div_8) {
++value = (value << 3) | digit;
++continue;
++}
++warn("Integer overflow in octal number");
++overflowed = TRUE;
++value_nv = (NV) value;
++}
++value_nv *= 8.0;
++value_nv += (NV)digit;
++continue;
++}
++if (digit == ('_' - '0') && len && allow_underscores
++&& (digit = s[1] - '0') && (digit >= 0 && digit <= 7))
++{
++--len;
++++s;
++goto redo;
++}
++if (digit == 8 || digit == 9) {
++if (!(*flags & PERL_SCAN_SILENT_ILLDIGIT))
++warn("Illegal octal digit '%c' ignored", *s);
++}
++break;
++}
++if ( ( overflowed && value_nv > 4294967295.0)
++#if UVSIZE > 4
++|| (!overflowed && value > 0xffffffff )
++#endif
++) {
++warn("Octal number > 037777777777 non-portable");
++}
++*len_p = s - start;
++if (!overflowed) {
++*flags = 0;
++return value;
++}
++*flags = PERL_SCAN_GREATER_THAN_UV_MAX;
++if (result)
++*result = value_nv;
++return UV_MAX;
++}
++#endif
++#endif
++#if !defined(my_snprintf)
++#if defined(NEED_my_snprintf)
++static int DPPP_(my_my_snprintf)(char * buffer, const Size_t len, const char * format, ...);
++static
++#else
++extern int DPPP_(my_my_snprintf)(char * buffer, const Size_t len, const char * format, ...);
++#endif
++#define my_snprintf DPPP_(my_my_snprintf)
++#define Perl_my_snprintf DPPP_(my_my_snprintf)
++#if defined(NEED_my_snprintf) || defined(NEED_my_snprintf_GLOBAL)
++int
++DPPP_(my_my_snprintf)(char *buffer, const Size_t len, const char *format, ...)
++{
++dTHX;
++int retval;
++va_list ap;
++va_start(ap, format);
++#ifdef HAS_VSNPRINTF
++retval = vsnprintf(buffer, len, format, ap);
++#else
++retval = vsprintf(buffer, format, ap);
++#endif
++va_end(ap);
++if (retval >= (int)len)
++Perl_croak(aTHX_ "panic: my_snprintf buffer overflow");
++return retval;
++}
++#endif
++#endif
++#ifdef NO_XSLOCKS
++#ifdef dJMPENV
++#define dXCPT dJMPENV; int rEtV = 0
++#define XCPT_TRY_START JMPENV_PUSH(rEtV); if (rEtV == 0)
++#define XCPT_TRY_END JMPENV_POP;
++#define XCPT_CATCH if (rEtV != 0)
++#define XCPT_RETHROW JMPENV_JUMP(rEtV)
++#else
++#define dXCPT Sigjmp_buf oldTOP; int rEtV = 0
++#define XCPT_TRY_START Copy(top_env, oldTOP, 1, Sigjmp_buf); rEtV = Sigsetjmp(top_env, 1); if (rEtV == 0)
++#define XCPT_TRY_END Copy(oldTOP, top_env, 1, Sigjmp_buf);
++#define XCPT_CATCH if (rEtV != 0)
++#define XCPT_RETHROW Siglongjmp(top_env, rEtV)
++#endif
++#endif
++#if !defined(my_strlcat)
++#if defined(NEED_my_strlcat)
++static Size_t DPPP_(my_my_strlcat)(char * dst, const char * src, Size_t size);
++static
++#else
++extern Size_t DPPP_(my_my_strlcat)(char * dst, const char * src, Size_t size);
++#endif
++#define my_strlcat DPPP_(my_my_strlcat)
++#define Perl_my_strlcat DPPP_(my_my_strlcat)
++#if defined(NEED_my_strlcat) || defined(NEED_my_strlcat_GLOBAL)
++Size_t
++DPPP_(my_my_strlcat)(char *dst, const char *src, Size_t size)
++{
++Size_t used, length, copy;
++used = strlen(dst);
++length = strlen(src);
++if (size > 0 && used < size - 1) {
++copy = (length >= size - used) ? size - used - 1 : length;
++memcpy(dst + used, src, copy);
++dst[used + copy] = '\0';
++}
++return used + length;
++}
++#endif
++#endif
++#if !defined(my_strlcpy)
++#if defined(NEED_my_strlcpy)
++static Size_t DPPP_(my_my_strlcpy)(char * dst, const char * src, Size_t size);
++static
++#else
++extern Size_t DPPP_(my_my_strlcpy)(char * dst, const char * src, Size_t size);
++#endif
++#define my_strlcpy DPPP_(my_my_strlcpy)
++#define Perl_my_strlcpy DPPP_(my_my_strlcpy)
++#if defined(NEED_my_strlcpy) || defined(NEED_my_strlcpy_GLOBAL)
++Size_t
++DPPP_(my_my_strlcpy)(char *dst, const char *src, Size_t size)
++{
++Size_t length, copy;
++length = strlen(src);
++if (size > 0) {
++copy = (length >= size) ? size - 1 : length;
++memcpy(dst, src, copy);
++dst[copy] = '\0';
++}
++return length;
++}
++#endif
++#endif
++#endif
+diff --git a/t/function_tests.t b/t/function_tests.t
+index b0a5c78..43acc48 100755
+--- a/t/function_tests.t
++++ b/t/function_tests.t
+@@ -1,10 +1,10 @@
+-use Test;
+-BEGIN { plan tests => 39 };
++#!/usr/bin/perl -w
++
++use Test::More tests => 39;
++
+ use strict;
+ use Time::Local::Extended qw(:ALL);
+ 
+-local $^W = 1; # warnings on, compatible with old Perls
+-
+ #
+ # Testing of CORE:: and Time::Local::
+ # modules can be turned on, but it is off by default.
+@@ -47,7 +47,7 @@ my $new_last_timelocal = 4039390799; # End of Year 2098
+ my $old_last_timegm  = $old_last_timelocal + $gmt_offset;
+ my $new_last_timegm  = $new_last_timelocal + $gmt_offset;
+ my $new_gmtime_limit = $new_limit_a        + $gmt_offset;
+-my $random_time_1 = 3182043600;
++my $random_time_1 = 3182040000;
+ my $random_time_2 = 4023794096;
+ my $summer_time   = 4026153599;
+ 
+@@ -60,81 +60,81 @@ my $summer_time   = 4026153599;
+ #
+ # timelocal
+ #
+-ok (timelocal(59,59,23,31,11,137)  == $old_last_timelocal);
+-ok (timelocal(0,0,0,1,0,138)       == $old_last_timelocal + 1);
+-ok (timelocal(7,14,22,18,0,138)    == $old_limit_a);
+-ok (timelocal(8,14,22,18,0,138)    == $old_limit_b);
+-ok (timelocal(0,0,0,1,10,170)      == $random_time_1);
+-ok (timelocal(59,59,23,31,11,197)  == $new_last_timelocal);
+-ok (timelocal(59,59,23,31,11,2097) == $new_last_timelocal);
++is( timelocal(59,59,23,31,11,137), $old_last_timelocal);
++is(timelocal(0,0,0,1,0,138)      , $old_last_timelocal + 1);
++is(timelocal(7,14,22,18,0,138)   , $old_limit_a);
++is(timelocal(8,14,22,18,0,138)   , $old_limit_b);
++is(timelocal(0,0,0,1,10,170)     , $random_time_1);
++is(timelocal(59,59,23,31,11,197) , $new_last_timelocal);
++is(timelocal(59,59,23,31,11,2097), $new_last_timelocal);
+ 
+ #
+ # timegm
+ #
+ 
+-ok (timegm(59,59,23,31,11,137) == $old_last_timegm);
+-ok (timegm(0,0,0,1,0,138)      == $old_last_timegm + 1);
++is(timegm(59,59,23,31,11,137), $old_last_timegm);
++is(timegm(0,0,0,1,0,138)     , $old_last_timegm + 1);
+ 
+-ok (timegm(7,14,3,19,0,138)    == $old_limit_a);
+-ok (timegm(8,14,3,19,0,138)    == $old_limit_b);
+-ok (timegm(0,0,5,1,10,170)     == $random_time_1);
+-ok (timegm(59,59,23,31,11,197) == $new_last_timegm);
+-ok (timegm(59,59,23,31,6,197)  == $summer_time);
++is(timegm(7,14,3,19,0,138)   , $old_limit_a);
++is(timegm(8,14,3,19,0,138)   , $old_limit_b);
++is(timegm(0,0,4,1,10,170)    , $random_time_1);
++is(timegm(59,59,23,31,11,197), $new_last_timegm);
++is(timegm(59,59,23,31,6,197) , $summer_time);
+ 
+ #
+ # localtime
+ #
+ 
+-ok (join ('|',localtime(0)) eq '0|0|19|31|11|69|3|364|0');
+-ok (scalar localtime(0)     eq 'Wed Dec 31 19:00:00 1969');
++is(join ('|',localtime(0)) , '0|0|19|31|11|69|3|364|0');
++is(scalar localtime(0)     , 'Wed Dec 31 19:00:00 1969');
+ 
+-ok (join ('|',localtime($old_limit_a)) eq '7|14|22|18|0|138|1|17|0');
+-ok (scalar localtime($old_limit_a)     eq 'Mon Jan 18 22:14:07 2038');
++is(join ('|',localtime($old_limit_a)) , '7|14|22|18|0|138|1|17|0');
++is(scalar localtime($old_limit_a)     , 'Mon Jan 18 22:14:07 2038');
+ 
+-ok (join ('|',localtime($old_limit_b)) eq '8|14|22|18|0|138|1|17|0');
+-ok (scalar localtime($old_limit_b)     eq 'Mon Jan 18 22:14:08 2038');
++is(join ('|',localtime($old_limit_b)) , '8|14|22|18|0|138|1|17|0');
++is(scalar localtime($old_limit_b)     , 'Mon Jan 18 22:14:08 2038');
+ 
+-ok (join ('|',localtime($new_limit_a)) eq '7|14|22|18|0|198|6|17|0');
+-ok (scalar localtime($new_limit_a)     eq 'Sat Jan 18 22:14:07 2098');
++is(join ('|',localtime($new_limit_a)) , '7|14|22|18|0|198|6|17|0');
++is(scalar localtime($new_limit_a)     , 'Sat Jan 18 22:14:07 2098');
+ 
+ #
+ # gmtime
+ #
+ 
+-ok (join ('|',gmtime(0)) eq '0|0|0|1|0|70|4|0|0');
+-ok (scalar gmtime(0)     eq 'Thu Jan  1 00:00:00 1970');
++is(join ('|',gmtime(0)) , '0|0|0|1|0|70|4|0|0');
++is(scalar gmtime(0)     , 'Thu Jan  1 00:00:00 1970');
+ 
+-ok (join ('|',gmtime($old_limit_a)) eq '7|14|3|19|0|138|2|18|0');
+-ok (scalar gmtime($old_limit_a)     eq 'Tue Jan 19 03:14:07 2038');
++is(join ('|',gmtime($old_limit_a)) , '7|14|3|19|0|138|2|18|0');
++is(scalar gmtime($old_limit_a)     , 'Tue Jan 19 03:14:07 2038');
+ 
+-ok (join ('|',gmtime($old_limit_b)) eq '8|14|3|19|0|138|2|18|0');
+-ok (scalar gmtime($old_limit_b)     eq 'Tue Jan 19 03:14:08 2038');
++is(join ('|',gmtime($old_limit_b)) , '8|14|3|19|0|138|2|18|0');
++is(scalar gmtime($old_limit_b)     , 'Tue Jan 19 03:14:08 2038');
+ 
+-ok (join ('|',gmtime($new_gmtime_limit)) eq '7|14|22|18|0|198|6|17|0');
+-ok (scalar gmtime($new_gmtime_limit)     eq 'Sat Jan 18 22:14:07 2098');
++is(join ('|',gmtime($new_gmtime_limit)) , '7|14|22|18|0|198|6|17|0');
++is(scalar gmtime($new_gmtime_limit)     , 'Sat Jan 18 22:14:07 2098');
+ 
+-ok (scalar gmtime($summer_time) eq 'Wed Jul 31 23:59:59 2097');
++is(scalar gmtime($summer_time) , 'Wed Jul 31 23:59:59 2097');
+ 
+ #
+ # UNIX_TIMESTAMP
+ #
+ 
+-ok (UNIX_TIMESTAMP('1970-01-01 00:00:00') == 3600 * 5);
+-ok (UNIX_TIMESTAMP('2038-01-18 22:14:07') == $old_limit_a);
+-ok (UNIX_TIMESTAMP('2038-01-18 22:14:08') == $old_limit_b);
+-ok (UNIX_TIMESTAMP('2097-07-04 12:34:56') == $random_time_2);
+-ok (UNIX_TIMESTAMP('2097-12-31 23:59:59') == $new_last_timelocal);
++is(UNIX_TIMESTAMP('1970-01-01 00:00:00'), 3600 * 5);
++is(UNIX_TIMESTAMP('2038-01-18 22:14:07'), $old_limit_a);
++is(UNIX_TIMESTAMP('2038-01-18 22:14:08'), $old_limit_b);
++is(UNIX_TIMESTAMP('2097-07-04 12:34:56'), $random_time_2);
++is(UNIX_TIMESTAMP('2097-12-31 23:59:59'), $new_last_timelocal);
+ # The following breaks under some (all?) Win32 configurations.
+-#ok (UNIX_TIMESTAMP('1969-12-31 19:00:00') == 0);
++#is(UNIX_TIMESTAMP('1969-12-31 19:00:00'), 0);
+ 
+ 
+ #
+ # FROM_UNIXTIME
+ #
+ 
+-ok (FROM_UNIXTIME($old_limit_a) eq '2038-01-18 22:14:07');
+-ok (FROM_UNIXTIME($old_limit_b) eq '2038-01-18 22:14:08');
+-ok (FROM_UNIXTIME($new_limit_a) eq '2098-01-18 22:14:07');
++is(FROM_UNIXTIME($old_limit_a) , '2038-01-18 22:14:07');
++is(FROM_UNIXTIME($old_limit_b) , '2038-01-18 22:14:08');
++is(FROM_UNIXTIME($new_limit_a) , '2098-01-18 22:14:07');
+ 
+ # Testing of CORE:: and Time::Local::
+ if ($RUN_ALL_TESTS)
+@@ -142,33 +142,33 @@ if ($RUN_ALL_TESTS)
+     #
+     # localtime
+     #
+-    ok (join ('|',CORE::localtime(0)) eq '0|0|19|31|11|69|3|364|0');
+-    ok (scalar CORE::localtime(0)     eq 'Wed Dec 31 19:00:00 1969');
+-    ok (join ('|',CORE::localtime($old_limit_a)) eq '7|14|22|18|0|138|1|17|0');
+-    ok (scalar CORE::localtime($old_limit_a)     eq 'Mon Jan 18 22:14:07 2038');
+-    ok (join ('|',CORE::localtime($old_limit_b)) eq '52|45|15|13|11|1|5|346|0');
+-    ok (scalar CORE::localtime($old_limit_b)     eq 'Fri Dec 13 15:45:52 1901');
+-    ok (join ('|',CORE::localtime($new_limit_a)) eq '51|45|15|13|11|37|1|346|0');
+-    ok (scalar CORE::localtime($new_limit_a)     eq 'Mon Dec 13 15:45:51 1937');
++    is(join ('|',CORE::localtime(0)) , '0|0|19|31|11|69|3|364|0');
++    is(scalar CORE::localtime(0)     , 'Wed Dec 31 19:00:00 1969');
++    is(join ('|',CORE::localtime($old_limit_a)) , '7|14|22|18|0|138|1|17|0');
++    is(scalar CORE::localtime($old_limit_a)     , 'Mon Jan 18 22:14:07 2038');
++    is(join ('|',CORE::localtime($old_limit_b)) , '52|45|15|13|11|1|5|346|0');
++    is(scalar CORE::localtime($old_limit_b)     , 'Fri Dec 13 15:45:52 1901');
++    is(join ('|',CORE::localtime($new_limit_a)) , '51|45|15|13|11|37|1|346|0');
++    is(scalar CORE::localtime($new_limit_a)     , 'Mon Dec 13 15:45:51 1937');
+ 
+     #
+     # gmtime
+     #
+-    ok (join ('|',CORE::gmtime(0)) eq '0|0|0|1|0|70|4|0|0');
+-    ok (scalar CORE::gmtime(0)     eq 'Thu Jan  1 00:00:00 1970');
++    is(join ('|',CORE::gmtime(0)) , '0|0|0|1|0|70|4|0|0');
++    is(scalar CORE::gmtime(0)     , 'Thu Jan  1 00:00:00 1970');
+ 
+-    ok (join ('|',CORE::gmtime($old_limit_a)) eq '7|14|3|19|0|138|2|18|0');
+-    ok (scalar CORE::gmtime($old_limit_a)     eq 'Tue Jan 19 03:14:07 2038');
++    is(join ('|',CORE::gmtime($old_limit_a)) , '7|14|3|19|0|138|2|18|0');
++    is(scalar CORE::gmtime($old_limit_a)     , 'Tue Jan 19 03:14:07 2038');
+ 
+-    ok (join ('|',CORE::gmtime($old_limit_b)) eq '52|45|20|13|11|1|5|346|0');
+-    ok (scalar CORE::gmtime($old_limit_b)     eq 'Fri Dec 13 20:45:52 1901');
++    is(join ('|',CORE::gmtime($old_limit_b)) , '52|45|20|13|11|1|5|346|0');
++    is(scalar CORE::gmtime($old_limit_b)     , 'Fri Dec 13 20:45:52 1901');
+ 
+-    ok (join ('|',CORE::gmtime($new_gmtime_limit)) eq '51|45|15|13|11|37|1|346|0');
+-    ok (scalar CORE::gmtime($new_gmtime_limit)     eq 'Mon Dec 13 15:45:51 1937');
++    is(join ('|',CORE::gmtime($new_gmtime_limit)) , '51|45|15|13|11|37|1|346|0');
++    is(scalar CORE::gmtime($new_gmtime_limit)     , 'Mon Dec 13 15:45:51 1937');
+ 
+     #
+     # timelocal
+     #
+-    ok (Time::Local::timelocal(59,59,23,31,11,137) == $old_last_timelocal);
+-    ok (Time::Local::timegm(59,59,23,31,11,137) == $old_last_timegm);
++    is(Time::Local::timelocal(59,59,23,31,11,137), $old_last_timelocal);
++    is(Time::Local::timegm(59,59,23,31,11,137), $old_last_timegm);
+ }
+diff --git a/t/is_leap.t b/t/is_leap.t
+new file mode 100644
+index 0000000..0609edd
+--- /dev/null
++++ b/t/is_leap.t
+@@ -0,0 +1,28 @@
++#!/usr/bin/perl -w
++
++use strict;
++use Time::Local::Extended;
++
++use Test::More 'no_plan';
++
++my $is_leap = \&Time::Local::Extended::is_leap;
++
++my %tests = (
++    2000        => 1,
++    2001        => 0,
++    2002        => 0,
++    2003        => 0,
++    2004        => 1,
++    2005        => 0,
++    2008        => 1,
++    2012        => 1,
++    2100        => 0,
++    2300        => 0,
++    2400        => 1,
++    2401        => 0,
++    2404        => 1,
++);
++
++while( my($year, $leap) = each %tests ) {
++    is !!$is_leap->($year), !!$leap, "is_leap($year)";
++}
+diff --git a/t/munge_year.t b/t/munge_year.t
+new file mode 100644
+index 0000000..6bff694
+--- /dev/null
++++ b/t/munge_year.t
+@@ -0,0 +1,28 @@
++#!/usr/bin/perl -w
++
++use strict;
++use Test::More 'no_plan';
++
++use Time::Local::Extended;
++
++my $munge_year = \&Time::Local::Extended::munge_year;
++
++my %tests = (
++    0           => 100,
++    1           => 101,
++    49          => 149,
++    50          => 150,
++    51          => 151,
++    99          => 99,
++    100         => 100,
++    999         => 999,
++    1000        => -900,
++    1999        => 99,
++    2001        => 101,
++    -2386       => -2386 - 1900,
++    -1          => -1901,
++);
++
++while(my($year, $munged) = each %tests) {
++    is $munge_year->($year), $munged, "munge_year($year)";
++}
+diff --git a/t/round_trip.t b/t/round_trip.t
+new file mode 100644
+index 0000000..616737c
+--- /dev/null
++++ b/t/round_trip.t
+@@ -0,0 +1,32 @@
++#!/usr/bin/perl -w
++
++use strict;
++use Test::More 'no_plan';
++
++use Time::Local::Extended qw(:ALL);
++
++# Edge case times to test.
++my @times = (2**44, 2**38, 2**37, 2**33, 2**31, 2**30, 1, 0, time, int rand 2**33);
++# And negatives
++push @times, map { -$_ } @times;
++
++for my $time (@times) {
++    {
++        my @date = localtime($time);
++        $date[5] += 1900;
++        is timelocal( @date ), $time, "timelocal(@date) / localtime($time)";
++        
++    }
++
++    {
++        my @date = gmtime($time);
++        print "# Year: $date[5]\n";
++        $date[5] += 1900;
++        is timegm( @date ), $time, "timegm(@date) / gmtime($time)";
++    }
++
++    {
++        my $stamp = FROM_UNIXTIME($time);
++        is UNIX_TIMESTAMP($stamp), $time, "FROM_UNIXTIME($time) / UNIX_TIMESTAMP($stamp)";
++    }
++}
+diff --git a/t/seconds_between.t b/t/seconds_between.t
+new file mode 100644
+index 0000000..750f96d
+--- /dev/null
++++ b/t/seconds_between.t
+@@ -0,0 +1,21 @@
++#!/usr/bin/perl -w
++
++use strict;
++use Time::Local::Extended;
++
++use Test::More 'no_plan';
++
++my $seconds_between = \&Time::Local::Extended::seconds_between;
++my $secs_per_day    = 60 * 60 * 24;
++my @tests = (
++    [2000, 2000, 0],
++    [2001, 2000, $secs_per_day*366],
++    [2004, 2000, ($secs_per_day * 365 * 3) + ($secs_per_day * 366)],
++    [2005, 2000, ($secs_per_day * 365 * 3) + ($secs_per_day * 366 * 2)],
++);
++
++for my $test ( @tests ) {
++    my($orig, $safe, $seconds) = @$test;
++    is $seconds_between->($orig, $safe), $seconds, "seconds_between($orig, $safe)";
++}
++
+diff --git a/time64.c b/time64.c
+new file mode 100644
+index 0000000..be8c482
+--- /dev/null
++++ b/time64.c
+@@ -0,0 +1,587 @@
++/* 
++
++Copyright (c) 2007-2008  Michael G Schwern
++
++This software originally derived from Paul Sheer's pivotal_gmtime_r.c.
++
++The MIT License:
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in
++all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++THE SOFTWARE.
++
++*/
++
++/*
++
++Programmers who have available to them 64-bit time values as a 'long
++long' type can use localtime64_r() and gmtime64_r() which correctly
++converts the time even on 32-bit systems. Whether you have 64-bit time 
++values will depend on the operating system.
++
++localtime64_r() is a 64-bit equivalent of localtime_r().
++
++gmtime64_r() is a 64-bit equivalent of gmtime_r().
++
++*/
++
++#include <assert.h>
++#include <stdlib.h>
++#include <stdio.h>
++#include <string.h>
++#include <time.h>
++#include <errno.h>
++#include "time64.h"
++
++static const int days_in_month[2][12] = {
++    {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
++    {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
++};
++
++static const int julian_days_by_month[2][12] = {
++    {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334},
++    {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335},
++};
++
++static const int length_of_year[2] = { 365, 366 };
++
++/* Number of days in a 400 year Gregorian cycle */
++static const Year years_in_gregorian_cycle = 400;
++static const int days_in_gregorian_cycle  = (365 * 400) + 100 - 4 + 1;
++
++/* 28 year calendar cycle between 2010 and 2037 */
++#define SOLAR_CYCLE_LENGTH 28
++static const int safe_years[SOLAR_CYCLE_LENGTH] = {
++    2016, 2017, 2018, 2019,
++    2020, 2021, 2022, 2023,
++    2024, 2025, 2026, 2027,
++    2028, 2029, 2030, 2031,
++    2032, 2033, 2034, 2035,
++    2036, 2037, 2010, 2011,
++    2012, 2013, 2014, 2015
++};
++
++static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
++    5, 0, 1, 2,     /* 0       2016 - 2019 */
++    3, 5, 6, 0,     /* 4  */
++    1, 3, 4, 5,     /* 8  */
++    6, 1, 2, 3,     /* 12 */
++    4, 6, 0, 1,     /* 16 */
++    2, 4, 5, 6,     /* 20      2036, 2037, 2010, 2011 */
++    0, 2, 3, 4      /* 24      2012, 2013, 2014, 2015 */
++};
++
++/* Let's assume people are going to be looking for dates in the future.
++   Let's provide some cheats so you can skip ahead.
++   This has a 4x speed boost when near 2008.
++*/
++/* Number of days since epoch on Jan 1st, 2008 GMT */
++#define CHEAT_DAYS  (1199145600 / 24 / 60 / 60)
++#define CHEAT_YEARS 108
++
++#define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
++#define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
++
++#ifdef USE_SYSTEM_LOCALTIME
++#    define SHOULD_USE_SYSTEM_LOCALTIME(a)  (       \
++    (a) <= SYSTEM_LOCALTIME_MAX &&              \
++    (a) >= SYSTEM_LOCALTIME_MIN                 \
++)
++#else
++#    define SHOULD_USE_SYSTEM_LOCALTIME(a)      (0)
++#endif
++
++#ifdef USE_SYSTEM_GMTIME
++#    define SHOULD_USE_SYSTEM_GMTIME(a)     (       \
++    (a) <= SYSTEM_GMTIME_MAX    &&              \
++    (a) >= SYSTEM_GMTIME_MIN                    \
++)
++#else
++#    define SHOULD_USE_SYSTEM_GMTIME(a)         (0)
++#endif
++
++/* Multi varadic macros are a C99 thing, alas */
++#ifdef TIME_64_DEBUG
++#    define TRACE(format) (fprintf(stderr, format))
++#    define TRACE1(format, var1)    (fprintf(stderr, format, var1))
++#    define TRACE2(format, var1, var2)    (fprintf(stderr, format, var1, var2))
++#    define TRACE3(format, var1, var2, var3)    (fprintf(stderr, format, var1, var2, var3))
++#else
++#    define TRACE(format) ((void)0)
++#    define TRACE1(format, var1) ((void)0)
++#    define TRACE2(format, var1, var2) ((void)0)
++#    define TRACE3(format, var1, var2, var3) ((void)0)
++#endif
++
++static int is_exception_century(Year year)
++{
++    int is_exception = ((year % 100 == 0) && !(year % 400 == 0));
++    TRACE1("# is_exception_century: %s\n", is_exception ? "yes" : "no");
++
++    return(is_exception);
++}
++
++
++Time64_T timegm64(struct TM *date) {
++    int      days    = 0;
++    Time64_T seconds = 0;
++    Year     year;
++
++    if( date->tm_year > 70 ) {
++        year = 70;
++        while( year < date->tm_year ) {
++            days += length_of_year[IS_LEAP(year)];
++            year++;
++        }
++    }
++    else if ( date->tm_year < 70 ) {
++        year = 69;
++        do {
++            days -= length_of_year[IS_LEAP(year)];
++            year--;
++        } while( year >= date->tm_year );
++    }
++
++    days += julian_days_by_month[IS_LEAP(date->tm_year)][date->tm_mon];
++    days += date->tm_mday - 1;
++
++    /* Avoid overflowing the days integer */
++    seconds = days;
++    seconds = seconds * 60 * 60 * 24;
++
++    seconds += date->tm_hour * 60 * 60;
++    seconds += date->tm_min * 60;
++    seconds += date->tm_sec;
++
++    return(seconds);
++}
++
++
++static int check_tm(struct TM *tm)
++{
++    /* Don't forget leap seconds */
++    assert(tm->tm_sec >= 0);
++    assert(tm->tm_sec <= 61);
++
++    assert(tm->tm_min >= 0);
++    assert(tm->tm_min <= 59);
++
++    assert(tm->tm_hour >= 0);
++    assert(tm->tm_hour <= 23);
++
++    assert(tm->tm_mday >= 1);
++    assert(tm->tm_mday <= days_in_month[IS_LEAP(tm->tm_year)][tm->tm_mon]);
++
++    assert(tm->tm_mon  >= 0);
++    assert(tm->tm_mon  <= 11);
++
++    assert(tm->tm_wday >= 0);
++    assert(tm->tm_wday <= 6);
++    
++    assert(tm->tm_yday >= 0);
++    assert(tm->tm_yday <= length_of_year[IS_LEAP(tm->tm_year)]);
++
++#ifdef HAS_TM_TM_GMTOFF
++    assert(tm->tm_gmtoff >= -24 * 60 * 60);
++    assert(tm->tm_gmtoff <=  24 * 60 * 60);
++#endif
++
++    return 1;
++}
++
++
++/* The exceptional centuries without leap years cause the cycle to
++   shift by 16
++*/
++static Year cycle_offset(Year year)
++{
++    const Year start_year = 2000;
++    Year year_diff  = year - start_year;
++    Year exceptions;
++
++    if( year > start_year )
++        year_diff--;
++
++    exceptions  = year_diff / 100;
++    exceptions -= year_diff / 400;
++
++    TRACE3("# year: %lld, exceptions: %lld, year_diff: %lld\n",
++          year, exceptions, year_diff);
++
++    return exceptions * 16;
++}
++
++/* For a given year after 2038, pick the latest possible matching
++   year in the 28 year calendar cycle.
++
++   A matching year...
++   1) Starts on the same day of the week.
++   2) Has the same leap year status.
++
++   This is so the calendars match up.
++
++   Also the previous year must match.  When doing Jan 1st you might
++   wind up on Dec 31st the previous year when doing a -UTC time zone.
++
++   Finally, the next year must have the same start day of week.  This
++   is for Dec 31st with a +UTC time zone.
++   It doesn't need the same leap year status since we only care about
++   January 1st.
++*/
++int safe_year(Year year)
++{
++    int safe_year;
++    Year year_cycle = year + cycle_offset(year);
++
++    /* Change non-leap xx00 years to an equivalent */
++    if( is_exception_century(year) )
++        year_cycle += 11;
++
++    /* Also xx01 years, since the previous year will be wrong */
++    if( is_exception_century(year - 1) )
++        year_cycle += 17;
++
++    year_cycle %= SOLAR_CYCLE_LENGTH;
++    if( year_cycle < 0 ) 
++        year_cycle = SOLAR_CYCLE_LENGTH + year_cycle;
++
++    assert( year_cycle >= 0 );
++    assert( year_cycle < SOLAR_CYCLE_LENGTH );
++    safe_year = safe_years[year_cycle];
++
++    assert(safe_year <= 2037 && safe_year >= 2010);
++    
++    TRACE3("# year: %lld, year_cycle: %lld, safe_year: %d\n",
++          year, year_cycle, safe_year);
++
++    return safe_year;
++}
++
++
++void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
++    if( src == NULL ) {
++        memset(dest, 0, sizeof(*dest));
++    }
++    else {
++#       ifdef USE_TM64
++            dest->tm_sec        = src->tm_sec;
++            dest->tm_min        = src->tm_min;
++            dest->tm_hour       = src->tm_hour;
++            dest->tm_mday       = src->tm_mday;
++            dest->tm_mon        = src->tm_mon;
++            dest->tm_year       = (Year)src->tm_year;
++            dest->tm_wday       = src->tm_wday;
++            dest->tm_yday       = src->tm_yday;
++            dest->tm_isdst      = src->tm_isdst;
++
++#           ifdef HAS_TM_TM_GMTOFF
++                dest->tm_gmtoff  = src->tm_gmtoff;
++#           endif
++
++#           ifdef HAS_TM_TM_ZONE
++                dest->tm_zone  = src->tm_zone;
++#           endif
++
++#       else
++            /* They're the same type */
++            memcpy(dest, src, sizeof(*dest));
++#       endif
++    }
++}
++
++
++void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
++    if( src == NULL ) {
++        memset(dest, 0, sizeof(*dest));
++    }
++    else {
++#       ifdef USE_TM64
++            dest->tm_sec        = src->tm_sec;
++            dest->tm_min        = src->tm_min;
++            dest->tm_hour       = src->tm_hour;
++            dest->tm_mday       = src->tm_mday;
++            dest->tm_mon        = src->tm_mon;
++            dest->tm_year       = (int)src->tm_year;
++            dest->tm_wday       = src->tm_wday;
++            dest->tm_yday       = src->tm_yday;
++            dest->tm_isdst      = src->tm_isdst;
++
++#           ifdef HAS_TM_TM_GMTOFF
++                dest->tm_gmtoff  = src->tm_gmtoff;
++#           endif
++
++#           ifdef HAS_TM_TM_ZONE
++                dest->tm_zone  = src->tm_zone;
++#           endif
++
++#       else
++            /* They're the same type */
++            memcpy(dest, src, sizeof(*dest));
++#       endif
++    }
++}
++
++
++/* Simulate localtime_r() to the best of our ability */
++struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
++    const struct tm *static_result = localtime(clock);
++
++    assert(result != NULL);
++
++    if( static_result == NULL ) {
++        memset(result, 0, sizeof(*result));
++        return NULL;
++    }
++    else {
++        memcpy(result, static_result, sizeof(*result));
++        return result;
++    }
++}
++
++
++/* Simulate gmtime_r() to the best of our ability */
++struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
++    const struct tm *static_result = gmtime(clock);
++
++    assert(result != NULL);
++
++    if( static_result == NULL ) {
++        memset(result, 0, sizeof(*result));
++        return NULL;
++    }
++    else {
++        memcpy(result, static_result, sizeof(*result));
++        return result;
++    }
++}
++
++
++struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
++{
++    int v_tm_sec, v_tm_min, v_tm_hour, v_tm_mon, v_tm_wday;
++    Time64_T v_tm_tday;
++    int leap;
++    Time64_T m;
++    Time64_T time = *in_time;
++    Year year = 70;
++    int cycles = 0;
++
++    assert(p != NULL);
++
++    /* Use the system gmtime() if time_t is small enough */
++    if( SHOULD_USE_SYSTEM_GMTIME(*in_time) ) {
++        time_t safe_time = *in_time;
++        struct tm safe_date;
++        GMTIME_R(&safe_time, &safe_date);
++
++        copy_tm_to_TM(&safe_date, p);
++        assert(check_tm(p));
++
++        return p;
++    }
++
++#ifdef HAS_TM_TM_GMTOFF
++    p->tm_gmtoff = 0;
++#endif
++    p->tm_isdst  = 0;
++
++#ifdef HAS_TM_TM_ZONE
++    p->tm_zone   = "UTC";
++#endif
++
++    v_tm_sec =  (int)(time % 60);
++    time /= 60;
++    v_tm_min =  (int)(time % 60);
++    time /= 60;
++    v_tm_hour = (int)(time % 24);
++    time /= 24;
++    v_tm_tday = time;
++
++    WRAP (v_tm_sec, v_tm_min, 60);
++    WRAP (v_tm_min, v_tm_hour, 60);
++    WRAP (v_tm_hour, v_tm_tday, 24);
++
++    v_tm_wday = (int)((v_tm_tday + 4) % 7);
++    if (v_tm_wday < 0)
++        v_tm_wday += 7;
++    m = v_tm_tday;
++
++    if (m >= CHEAT_DAYS) {
++        year = CHEAT_YEARS;
++        m -= CHEAT_DAYS;
++    }
++
++    if (m >= 0) {
++        /* Gregorian cycles, this is huge optimization for distant times */
++        cycles = (int)(m / (Time64_T) days_in_gregorian_cycle);
++        if( cycles ) {
++            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
++            year += (cycles * years_in_gregorian_cycle);
++        }
++
++        /* Years */
++        leap = IS_LEAP (year);
++        while (m >= (Time64_T) length_of_year[leap]) {
++            m -= (Time64_T) length_of_year[leap];
++            year++;
++            leap = IS_LEAP (year);
++        }
++
++        /* Months */
++        v_tm_mon = 0;
++        while (m >= (Time64_T) days_in_month[leap][v_tm_mon]) {
++            m -= (Time64_T) days_in_month[leap][v_tm_mon];
++            v_tm_mon++;
++        }
++    } else {
++        year--;
++
++        /* Gregorian cycles */
++        cycles = (int)((m / (Time64_T) days_in_gregorian_cycle) + 1);
++        if( cycles ) {
++            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
++            year += (cycles * years_in_gregorian_cycle);
++        }
++
++        /* Years */
++        leap = IS_LEAP (year);
++        while (m < (Time64_T) -length_of_year[leap]) {
++            m += (Time64_T) length_of_year[leap];
++            year--;
++            leap = IS_LEAP (year);
++        }
++
++        /* Months */
++        v_tm_mon = 11;
++        while (m < (Time64_T) -days_in_month[leap][v_tm_mon]) {
++            m += (Time64_T) days_in_month[leap][v_tm_mon];
++            v_tm_mon--;
++        }
++        m += (Time64_T) days_in_month[leap][v_tm_mon];
++    }
++
++    p->tm_year = year;
++    if( p->tm_year != year ) {
++#ifdef EOVERFLOW
++        errno = EOVERFLOW;
++#endif
++        return NULL;
++    }
++
++    /* At this point m is less than a year so casting to an int is safe */
++    p->tm_mday = (int) m + 1;
++    p->tm_yday = julian_days_by_month[leap][v_tm_mon] + (int)m;
++    p->tm_sec  = v_tm_sec;
++    p->tm_min  = v_tm_min;
++    p->tm_hour = v_tm_hour;
++    p->tm_mon  = v_tm_mon;
++    p->tm_wday = v_tm_wday;
++    
++    assert(check_tm(p));
++
++    return p;
++}
++
++
++struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
++{
++    time_t safe_time;
++    struct tm safe_date;
++    struct TM gm_tm;
++    Year orig_year;
++    int month_diff;
++
++    assert(local_tm != NULL);
++
++    /* Use the system localtime() if time_t is small enough */
++    if( SHOULD_USE_SYSTEM_LOCALTIME(*time) ) {
++        safe_time = *time;
++
++        TRACE1("Using system localtime for %lld\n", *time);
++
++        LOCALTIME_R(&safe_time, &safe_date);
++
++        copy_tm_to_TM(&safe_date, local_tm);
++        assert(check_tm(local_tm));
++
++        return local_tm;
++    }
++
++    if( gmtime64_r(time, &gm_tm) == NULL ) {
++        TRACE1("gmtime64_r returned null for %lld\n", *time);
++        return NULL;
++    }
++
++    orig_year = gm_tm.tm_year;
++
++    if (gm_tm.tm_year > (2037 - 1900) ||
++        gm_tm.tm_year < (1970 - 1900)
++       )
++    {
++        TRACE1("Mapping tm_year %lld to safe_year\n", (Year)gm_tm.tm_year);
++        gm_tm.tm_year = safe_year((Year)(gm_tm.tm_year + 1900)) - 1900;
++    }
++
++    safe_time = timegm64(&gm_tm);
++    if( LOCALTIME_R(&safe_time, &safe_date) == NULL ) {
++        TRACE1("localtime_r(%d) returned NULL\n", (int)safe_time);
++        return NULL;
++    }
++
++    copy_tm_to_TM(&safe_date, local_tm);
++
++    local_tm->tm_year = orig_year;
++    if( local_tm->tm_year != orig_year ) {
++        TRACE2("tm_year overflow: tm_year %lld, orig_year %lld\n",
++              (Year)local_tm->tm_year, (Year)orig_year);
++
++#ifdef EOVERFLOW
++        errno = EOVERFLOW;
++#endif
++        return NULL;
++    }
++
++
++    month_diff = local_tm->tm_mon - gm_tm.tm_mon;
++
++    /*  When localtime is Dec 31st previous year and
++        gmtime is Jan 1st next year.
++    */
++    if( month_diff == 11 ) {
++        local_tm->tm_year--;
++    }
++
++    /*  When localtime is Jan 1st, next year and
++        gmtime is Dec 31st, previous year.
++    */
++    if( month_diff == -11 ) {
++        local_tm->tm_year++;
++    }
++
++    /* GMT is Jan 1st, xx01 year, but localtime is still Dec 31st 
++       in a non-leap xx00.  There is one point in the cycle
++       we can't account for which the safe xx00 year is a leap
++       year.  So we need to correct for Dec 31st comming out as
++       the 366th day of the year.
++    */
++    if( !IS_LEAP(local_tm->tm_year) && local_tm->tm_yday == 365 )
++        local_tm->tm_yday--;
++
++    assert(check_tm(local_tm));
++    
++    return local_tm;
++}
+diff --git a/time64.h b/time64.h
+new file mode 100644
+index 0000000..771849b
+--- /dev/null
++++ b/time64.h
+@@ -0,0 +1,64 @@
++#include <time.h>
++#include "time64_config.h"
++
++#ifndef TIME64_H
++#    define TIME64_H
++
++
++/* Set our custom types */
++typedef INT_64_T        Int64;
++typedef Int64           Time64_T;
++typedef Int64           Year;
++
++
++/* A copy of the tm struct but with a 64 bit year */
++struct TM64 {
++        int     tm_sec;
++        int     tm_min;
++        int     tm_hour;
++        int     tm_mday;
++        int     tm_mon;
++        Year    tm_year;
++        int     tm_wday;
++        int     tm_yday;
++        int     tm_isdst;
++
++#ifdef HAS_TM_TM_GMTOFF
++        long    tm_gmtoff;
++#endif
++
++#ifdef HAS_TM_TM_ZONE
++        char    *tm_zone;
++#endif
++};
++
++
++/* Decide which tm struct to use */
++#ifdef USE_TM64
++#define TM      TM64
++#else
++#define TM      tm
++#endif   
++
++
++/* Declare public functions */
++struct TM *gmtime64_r    (const Time64_T *, struct TM *);
++struct TM *localtime64_r (const Time64_T *, struct TM *);
++Time64_T   timegm64      (struct TM *);
++
++/* expose safe_year for our timelocal() hack */
++int safe_year(Year);
++
++/* Not everyone has gm/localtime_r(), provide a replacement */
++#ifdef HAS_LOCALTIME_R
++#    define LOCALTIME_R(clock, result) localtime_r(clock, result)
++#else
++#    define LOCALTIME_R(clock, result) fake_localtime_r(clock, result)
++#endif
++#ifdef HAS_GMTIME_R
++#    define GMTIME_R(clock, result)    gmtime_r(clock, result)
++#else
++#    define GMTIME_R(clock, result)    fake_gmtime_r(clock, result)
++#endif
++
++#endif
+diff --git a/time64_config.h.in b/time64_config.h.in
+new file mode 100644
+index 0000000..5182bc2
+--- /dev/null
++++ b/time64_config.h.in
+@@ -0,0 +1,84 @@
++#include "config.h"
++
++#ifndef TIME64_CONFIG_H
++#    define TIME64_CONFIG_H
++
++/* Configuration
++   -------------
++   Define as appropriate for your system.
++   Sensible defaults provided.
++*/
++
++/* Debugging
++   TIME_64_DEBUG
++   Define if you want debugging messages
++*/
++/* #define TIME_64_DEBUG */
++
++
++/* INT_64_T
++   A 64 bit integer type to use to store time and others.
++   Must be defined.
++*/
++#define INT_64_T                %%quadtype%%
++
++
++/* USE_TM64
++   Should we use a 64 bit safe replacement for tm?  This will
++   let you go past year 2 billion but the struct will be incompatible
++   with tm.  Conversion functions will be provided.
++*/
++#define USE_TM64
++
++
++/* Availability of system functions.
++
++   HAS_GMTIME_R
++   Define if your system has gmtime_r()
++
++   HAS_LOCALTIME_R
++   Define if your system has localtime_r()
++
++   HAS_TIMEGM
++   Define if your system has timegm(), a GNU extension.
++*/
++/* Set by Config */
++
++
++/* Details of non-standard tm struct elements.
++
++   HAS_TM_TM_GMTOFF
++   True if your tm struct has a "tm_gmtoff" element.
++   A BSD extension.
++
++   HAS_TM_TM_ZONE
++   True if your tm struct has a "tm_zone" element.
++   A BSD extension.
++*/
++/* Don't need em */
++
++
++/* USE_SYSTEM_LOCALTIME
++   USE_SYSTEM_GMTIME
++   Should we use the system functions if the time is inside their range?
++   Your system localtime() is probably more accurate, but our gmtime() is
++   fast and safe.
++*/
++#define USE_SYSTEM_LOCALTIME
++/* #define USE_SYSTEM_GMTIME */
++
++
++/* SYSTEM_LOCALTIME_MAX
++   SYSTEM_LOCALTIME_MIN
++   SYSTEM_GMTIME_MAX
++   SYSTEM_GMTIME_MIN
++   Maximum and minimum values your system's gmtime() and localtime()
++   can handle.  We will use your system functions if the time falls
++   inside these ranges.
++*/
++#define SYSTEM_LOCALTIME_MAX     2147483647
++#define SYSTEM_LOCALTIME_MIN     0
++#define SYSTEM_GMTIME_MAX        2147483647
++#define SYSTEM_GMTIME_MIN        0
++
++#endif /* TIME64_CONFIG_H */
+diff --git a/typemap b/typemap
+new file mode 100644
+index 0000000..2098b15
+--- /dev/null
++++ b/typemap
+@@ -0,0 +1,4 @@
++const Time64_T          T_NV
++Time64_T                T_NV
++const Year              T_NV
++const int               T_IV
+\ No newline at end of file
