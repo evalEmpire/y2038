@@ -30,6 +30,10 @@
      * Figure out what to do about ISO8601
      * wchars
      * could do with better commenting
+     * The use of modulo in this file is not necessarily safe on pre-C99
+       compilers
+     * Gah. Nor is the use of larger ints. I think it's OK but I'd better
+       go back 'n check
 
 */
 
@@ -108,19 +112,81 @@
 
    Actually might get away without this. I'll leave the preprocessing in here
    in case we do, remove it later if it turns out we can get around it.
+
+   But we need stdint if we can. Same principle.
 */
 #ifdef WE_HAVE_C99
 #  undef HAS_SNPRINTF
 #  define HAS_SNPRINTF
+#  undef WE_HAVE_STDINT
+#  define WE_HAVE_STDINT
 #endif
 
+/* Sized ints. Get the standard set or fake it. Note you may need to override
+   the I64_FORMAT if you're using a 17th century compiler */
+#ifdef WE_HAVE_STDINT
+#  include <stdint.h>
+#  include <inttypes.h>
+#  define I64_FORMAT PRId64
+#else
+#  ifdef INT_64_T
+typedef INT_64_T int64_t;
+#  else
+#    error "No 64 bit type given (-DINT_64_T='long long' maybe?)"
+#  endif
+#  ifndef I64_FORMAT
+#    error "No format for 64 bit type (-DI64_FORMAT='lld' maybe?)"
+#  endif
+#endif
 #include "time64.h"
+
+#define NO_PADDING 'N'
+#define DEFAULT_PADDING 'D'
 
 typedef enum {
   copying_input,
   reading_modifiers,
   reading_width
 } strftime_state;
+
+/* the traditional C sucks. Standard strncpy returns dest, which is almost
+   always useless. We return the number of characters written.
+  
+   NOTE!! We don't add the terminating '\0'. In this context it's handled
+   elsewhere, but don't cut&paste this without being sure you know the
+   consequences. */
+static size_t scpy(char * dest, char const * src, size_t const len) {
+  size_t l=len;
+  while(*src&&l) {
+    *dest++=*src++;
+    --l;
+  }
+  return len-l;
+}
+
+#ifndef I64_FORMAT
+/* This is for when we don't have a format for printing 64 bit integers. It's
+   pretty theoretical since everything does if it has them at all, this is
+   basically a safety in case the format string isn't available */
+void format_64_int(char * s, int64_t i) {
+  long a, b;
+  if(i<0) {
+    *s++='-';
+    i=-i;
+  }
+  a=i%1000000000L;
+  i/=1000000000L;
+  b=i%1000000000L;
+  i/=1000000000L;
+  if(i!=0)
+    sprintf(s, "%d%09ld%09ld", (int)i, b, a);
+  else if(b)
+    sprintf(s, "%d%09d", b, a);
+  else
+    sprintf(s, "%d", a);
+}
+#endif;
+
 
 size_t strftime64(char * s, size_t max, const char * format,
                   const struct TM * tm) {
@@ -149,13 +215,17 @@ size_t strftime64(char * s, size_t max, const char * format,
 
   output_pos=0;
   state=copying_input;
-  while(*format&&(output_pos<max)) {
-    char const * format_start_pos;
-    int padding=' ';
-    bool force_lc=false;
-    bool swap_case=false;
-    bool alternate_representation=false;
-    bool alternate_numbers=false;
+  char const * format_start_pos=NULL;
+  char const * format_width_beginning=NULL;
+  int padding=DEFAULT_PADDING;
+  int output_int;
+  int default_width;
+  bool force_lc=false;
+  bool swap_case=false;
+  bool alternate_representation=false;
+  bool alternate_numbers=false;
+  bool stf_err=false;
+  while(!stf_err&&*format&&(output_pos<max)) {
     if(state==copying_input) {
       if(*format=='%') {
         format_start_pos=format++;
@@ -164,6 +234,8 @@ size_t strftime64(char * s, size_t max, const char * format,
         if(enc_is_safe)
           s[output_pos++]=*format++;
         else {
+          /* THIS IS INCORRECT albeit only slightly (need to make it
+             reentrant and handle the redundant shift situation) */
           int mbl=mblen(format, MB_CUR_MAX);
           assert(mbl); /* since '\0' should be caught by the loop cond */
           if(mbl<0)
@@ -238,39 +310,39 @@ size_t strftime64(char * s, size_t max, const char * format,
 	     really useful with anything but %Z. However, surely it might be
 	     useful with %p or %P, or when ^ is used. Not quite sure what to
 	     do atm, but I'll investigate */
-	  swap_case=true;
-	  ++format;
-	  break;
+          swap_case=true;
+          ++format;
+          break;
 
         case '-':
-	  padding=NO_PADDING;
-	  ++format;
+          padding=NO_PADDING;
+          ++format;
 	  break;
 
         case '^':
-	  force_lc=true;
-	  ++format;
-	  break;
+          force_lc=true;
+          ++format;
+          break;
 	  
         case '_':
-	  padding=' ';
-	  ++format;
-	  break;
+          padding=' ';
+          ++format;
+          break;
 
         case '0':
-	  padding='0';
-	  ++format;
-	  break;
+          padding='0';
+          ++format;
+          break;
 
         case 'E':
-	  alternate_representation=true;
-	  ++format;
-	  break;
+          alternate_representation=true;
+          ++format;
+          break;
 
         case 'O':
-	  alternate_numbers=true;
-	  ++format;
-	  break;
+          alternate_numbers=true;
+          ++format;
+          break;
 
         /* The numbers, apart from 0 which has a dual role. These mean we're
            getting a format width. */
@@ -284,99 +356,130 @@ size_t strftime64(char * s, size_t max, const char * format,
         case '7':
         case '8':
         case '9':
-          /* I'll figure these out later */
-          switch(state) {
-            case reading_modifiers:
-              state=reading_width;
-            case reading_width:
-              sprintf(dump_buffer, "(Number: %c)", (int)*format);
-              format++;
-              output_string=dump_buffer;
-              goto output_some_string;
-
-            default:
-              assert(false);
+          if(state==reading_modifiers) {
+            format_width_beginning=format;
+            state=reading_width;
           }
+          format++;
           break;
   
         /* Finally, the actual conversion specifier characters */
         case 'A':
           output_string=nl_langinfo(DAY_1+tm->tm_wday);
+          default_width=0;
           goto output_final_string;
   
         case 'a':
           output_string=nl_langinfo(ABDAY_1+tm->tm_wday);
+          default_width=0;
           goto output_final_string;
   
         case 'B':
           output_string=nl_langinfo(MON_1+tm->tm_mon);
+          default_width=0;
           goto output_final_string;
   
         case 'b':
         case 'h':
           output_string=nl_langinfo(ABMON_1+tm->tm_mon);
+          default_width=0;
           goto output_final_string;
   
         case 'C':
           /* SU requires this to be 2 digits, but we ignore that. By default
              it's hence at lease 2 digits. This is debatable, so, give feedback
              if you want it changing... */
-          n_wr=snprintf(s+output_pos, max-output_pos,
-            "%2lld", (long long)(tm->tm_year+1900)/100);
-        move_on:
-          ++format;
-          force_lc=false;
-          swap_case=false;
-          alternate_representation=false;
-          alternate_numbers=false;
-          if(n_wr>0)
-            output_pos+=n_wr;
-          /* not a great deal we can do about it if there's an error signaled */
-          state=copying_input;
+#ifdef I64_FORMAT
+          sprintf(dump_buffer, "%" I64_FORMAT, tm->tm_year/100+19);
+#else
+          format_64_int(dump_buffer, tm->tm_year/100+19);
+#endif
+          output_string=dump_buffer;
+          default_width=2;
+          padding='0';
+          goto output_final_string;
+  
+        case 'c':
+          /* we'll "borrow" output_string for the format ;) */
+          output_string=nl_langinfo(D_T_FMT);
+        recurse_with_output_string_as_format:
+          {
+            size_t n_written;
+
+            n_written=strftime64(s+output_pos, max-output_pos,
+              output_string, tm);
+            /* We'll try to keep the string safe even if there's an error;
+               not everyone checks the return value... */
+            if(n_written==0)
+              stf_err=true;
+            else
+              output_pos+=n_written;
+            ++format;
+          }
           break;
-  
+
         case 'D':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%02d/%02d/%02d",
-            tm->tm_mday, tm->tm_mon+1, (int)tm->tm_year%100);
-          goto move_on;
-  
-        case 'd':
-          n_wr=snprintf(s+output_pos, max-output_pos,
-            "%02d", tm->tm_mday);
-          goto move_on;
+          sprintf(dump_buffer, "%02d/%02d/%02d",
+            tm->tm_mon+1, tm->tm_mday, (int)tm->tm_year%100);
+          output_string=dump_buffer;
+          default_width=0;
+          goto output_final_string;
   
         case 'e':
-          n_wr=snprintf(s+output_pos, max-output_pos,
-            "%2d", tm->tm_mday);
-          goto move_on;
+          padding=' ';
+        case 'd':
+          output_int=tm->tm_mday;
+          default_width=2;
+          goto output_final_int;
+          
+        case 'F':
+          /* We need to handle dates outside the 0000-9999 range here. Not
+             doing this for the moment; we'll come back to it...
+
+             We're using an iterative methodology. Right? */
+          if((tm->tm_year>=0)||(tm->tm_year<10000)) {
+            sprintf(dump_buffer, "%04" I64_FORMAT "-%02d-%02d",
+              tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday);
+            output_string=dump_buffer;
+          } else {
+            output_string="0000-00-00";
+            stf_err=true;
+          }
+          default_width=0;
+          padding=' ';
+          goto output_final_string;
   
         case 'H':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%02d", tm->tm_hour);
-          goto move_on;
-  
-        case 'I':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%02d", tm->tm_hour%12);
-          goto move_on;
-  
-        case 'j':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%03d", tm->tm_yday);
-          goto move_on;
-  
-        case 'k':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%2d", tm->tm_hour);
-          goto move_on;
+          output_int=tm->tm_hour;
+          default_width=2;
+          goto output_final_int;
   
         case 'l':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%2d", tm->tm_hour%12);
-          goto move_on;
+          padding=' ';
+        case 'I':
+          output_int=tm->tm_hour%12;
+          default_width=2;
+          goto output_final_int;
+  
+        case 'j':
+          output_int=tm->tm_yday;
+          default_width=3;
+          goto output_final_int;
+  
+        case 'k':
+          output_int=tm->tm_hour;
+          default_width=2;
+          goto output_final_int;
   
         case 'M':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%02d", tm->tm_min);
-          goto move_on;
+          output_int=tm->tm_min;
+          default_width=2;
+          goto output_final_int;
   
         case 'm':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%02d", tm->tm_mon);
-          goto move_on;
+          output_int=tm->tm_mon+1;
+          default_width=2;
+          goto output_final_int;
   
         case 'n':
           s[output_pos++]='\n';
@@ -384,25 +487,29 @@ size_t strftime64(char * s, size_t max, const char * format,
           state=copying_input;
           break;
   
-        case 'P':
-          output_string="(%P: Not yet implemented)";
-          goto output_final_string;
-  
         case 'p':
           if(tm->tm_hour<12)
             output_string=nl_langinfo(AM_STR);
           else
             output_string=nl_langinfo(PM_STR);
+          default_width=0;
           goto output_final_string;
   
         case 'R':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%02d:%02d",
-            tm->tm_hour, tm->tm_min);
-          goto move_on;
+          sprintf(dump_buffer, "%02d:%02d", tm->tm_hour, tm->tm_min);
+          output_string=dump_buffer;
+          default_width=0;
+          goto output_final_string;
   
+        case 'r':
+          /* borrowing output_string again... */
+          output_string=nl_langinfo(T_FMT_AMPM);
+          goto recurse_with_output_string_as_format;
+
         case 'S':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%02d", tm->tm_sec);
-          goto move_on;
+          output_int=tm->tm_sec;
+          default_width=2;
+          goto output_final_int;
   
         case 's':
           /* This may well be unix specific. */
@@ -410,72 +517,128 @@ size_t strftime64(char * s, size_t max, const char * format,
           goto output_final_string;
   
         case 'T':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%02d:%02d:%02d",
+          sprintf(dump_buffer, "%02d:%02d:%02d",
             tm->tm_hour, tm->tm_min, tm->tm_sec);
-          goto move_on;
+          output_string=dump_buffer;
+          default_width=0;
+          goto output_final_string;
   
         case 't':
+          /* !!MBCS!! */
           s[output_pos++]='\t';
           ++format;
           state=copying_input;
           break;
   
+        case 'U':
+          output_int=(tm->tm_yday-tm->tm_wday+6)/7;
+          default_width=2;
+          goto output_final_int;
+
         case 'u':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%d",
-            tm->tm_wday?tm->tm_wday:7);
-          goto move_on;
+          output_int=tm->tm_wday?tm->tm_wday:7;
+          default_width=1;
+          goto output_final_int;
   
+        case 'W':
+          output_int=(tm->tm_yday-(tm->tm_wday+1)%7+6)/7;
+          default_width=2;
+          goto output_final_int;
+
         case 'w':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%d", tm->tm_wday);
-          goto move_on; 
+          output_int=tm->tm_wday;
+          default_width=1;
+          goto output_final_int;
   
+        case 'X':
+          output_string=nl_langinfo(T_FMT);
+          goto recurse_with_output_string_as_format;
+
+        case 'x':
+          output_string=nl_langinfo(D_FMT);
+          goto recurse_with_output_string_as_format;
+
         case 'Y':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%4lld",
-            (long long)tm->tm_year+1900);
-          goto move_on;
+#ifdef I64_FORMAT
+          sprintf(dump_buffer, "%" I64_FORMAT, tm->tm_year+1900);
+#else
+          format_64_int(dump_buffer, tm->tm_year/1900);
+#endif
+          output_string=dump_buffer;
+          default_width=4;
+          padding='0';
+          goto output_final_string;
   
         case 'y':
-          n_wr=snprintf(s+output_pos, max-output_pos, "%2d",
-            (int)tm->tm_year%100);
-          goto move_on;
+          output_int=tm->tm_year%100;
+          default_width=2;
+        output_final_int:
+          if(padding==DEFAULT_PADDING)
+            padding='0';
+          sprintf(dump_buffer, "%d", output_int);
+          output_string=dump_buffer;
+          goto output_final_string;
   
         
   
-        case 'c':
-        case 'F':
         case 'G':
         case 'g':
-        case 'r':
-        case 'U':
+        case 'P':
         case 'V':
-        case 'W':
-        case 'X':
-        case 'x':
+
+        /* Z and z may prove a challenge; may need to forward it on to the
+           underlying strftime. I've tried to avoid that for reasons of
+           efficiency; we'll C */
         case 'Z':
         case 'z':
           sprintf(dump_buffer, "(%c: Not yet implemented)", (int)*format);
           output_string=dump_buffer;
         output_final_string:
+          if(padding==DEFAULT_PADDING)
+            padding=' ';
+          {
+            /* I don't think this section is technically MBCS safe. TBC */
+            size_t n_to_cp=strlen(output_string);
+            int pad_width;
+            if(format_width_beginning) {
+              pad_width=atoi(format_width_beginning);
+              if(pad_width>=10000)
+                /* silly long. Almost certainly an error. GNU rejects this so
+                   we're compatible */
+                goto dump_duff_format;
+            } else
+              pad_width=default_width;
+            if(padding==NO_PADDING)
+                /* override the previously set width */
+              pad_width=0;
+            if(pad_width>n_to_cp)
+              pad_width-=n_to_cp;
+            else
+              pad_width=0;
+            if(pad_width>max-output_pos)
+              pad_width=max-output_pos;
+            memset(s+output_pos, padding, pad_width);
+            output_pos+=pad_width;
+            output_pos+=scpy(s+output_pos, output_string, max-output_pos);
+          }
           state=copying_input;
-          ++format;
+          format_start_pos=NULL;
+          format_width_beginning=NULL;
           force_lc=false;
           swap_case=false;
           alternate_representation=false;
           alternate_numbers=false;
-        output_some_string:
-          {
-            size_t n_to_cp=strlen(output_string);
-            if(n_to_cp>max-output_pos)
-              n_to_cp=max-output_pos;
-            memcpy(s+output_pos, output_string, n_to_cp);
-            output_pos+=n_to_cp;
-          }
+          padding=DEFAULT_PADDING;
+          ++format;
           break;
   
         /* And the one very special character */
   
         case '%':
           output_string="%";
+          default_width=0;
+          if(padding==DEFAULT_PADDING)
+            padding=' ';
           goto output_final_string;
   
         /* In the default case, we look for an mbchar, and copy whatever we
