@@ -4,6 +4,7 @@ OPTIMIZE = -g
 INCLUDE  = -I.
 CC       = gcc
 WARNINGS = -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion
+COVERAGE = -fprofile-arcs -ftest-coverage
 CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 COMPILE  = $(CC) $(CFLAGS)
 LINK     = $(COMPILE)
@@ -87,4 +88,5 @@ clean:
 		t/gmtime_test		\
 		t/*_test.out.bz2	\
 		t/bench			\
+		*.gc*			\
 		$(OBJECTS)
