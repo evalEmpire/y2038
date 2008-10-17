@@ -225,12 +225,12 @@ size_t strftime64(char * s, size_t max, const char * format,
         else {
           /* THIS IS INCORRECT albeit only slightly (need to make it
              reentrant and handle the redundant shift situation) */
-          int mbl=mblen(format, MB_CUR_MAX);
+          int mbl = mblen(format, (size_t)MB_CUR_MAX);
           assert(mbl); /* since '\0' should be caught by the loop cond */
           if(mbl<0)
             mbl=1;
-          if(max-output_pos<=mbl) {
-            strncpy(s+output_pos, format, mbl);
+          if( max - output_pos <= (size_t)mbl) {
+            strncpy(s+output_pos, format, (size_t)mbl);
             format+=mbl;
             output_pos+=mbl;
           } else {
@@ -251,7 +251,7 @@ size_t strftime64(char * s, size_t max, const char * format,
                                   will ever occur in production, this is just
                                   while testing. */
         char * output_string;
-        int n_wr;
+        size_t n_wr;
 
         /* ANSI requires that some characters are available as a single char
            in the compilation environment. We process these directly. It should
@@ -428,7 +428,7 @@ size_t strftime64(char * s, size_t max, const char * format,
              We're using an iterative methodology. Right? */
           if((tm->tm_year>=0)||(tm->tm_year<10000)) {
             sprintf(dump_buffer, "%04" I64_FORMAT "-%02d-%02d",
-              tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday);
+                    (Year)tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday);
             output_string=dump_buffer;
           } else {
             output_string="0000-00-00";
@@ -588,9 +588,9 @@ size_t strftime64(char * s, size_t max, const char * format,
           {
             /* I don't think this section is technically MBCS safe. TBC */
             size_t n_to_cp=strlen(output_string);
-            int pad_width;
+            size_t pad_width;
             if(format_width_beginning) {
-              pad_width=atoi(format_width_beginning);
+              pad_width = (size_t)atoi(format_width_beginning);
               if(pad_width>=10000)
                 /* silly long. Almost certainly an error. GNU rejects this so
                    we're compatible */
@@ -600,11 +600,11 @@ size_t strftime64(char * s, size_t max, const char * format,
             if(padding==NO_PADDING)
                 /* override the previously set width */
               pad_width=0;
-            if(pad_width>n_to_cp)
+            if(pad_width > n_to_cp)
               pad_width-=n_to_cp;
             else
               pad_width=0;
-            if(pad_width>max-output_pos)
+            if(pad_width > max - output_pos)
               pad_width=max-output_pos;
             memset(s+output_pos, padding, pad_width);
             output_pos+=pad_width;
@@ -641,9 +641,9 @@ size_t strftime64(char * s, size_t max, const char * format,
              programmer with clues ;) Also that's what the gnu strftime
              seems to do */
           assert(format_start_pos);
-          n_wr=format-format_start_pos<max-output_pos?
-            format-format_start_pos:
-            max-output_pos;
+          n_wr = (format - format_start_pos < max - output_pos)
+                    ? format - format_start_pos
+                    : max - output_pos;
           strncpy(s+output_pos, format_start_pos, n_wr);
           output_pos+=n_wr;
           state=copying_input;
