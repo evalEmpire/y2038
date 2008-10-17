@@ -37,9 +37,12 @@
 
 */
 
-#undef WE_HAVE_C99
+#include "time64.h"
+
+
+#undef HAVE_C99
 #if defined(__STDC_VERSION__)&&(__STDC_VERSION__>=199901L)
-#  define WE_HAVE_C99
+#  define HAVE_C99
 #endif
 
 /* ENCODING_IS_SAFE and ENCODING_IS_UNSAFE are designed to declare whether
@@ -59,7 +62,7 @@
    silly things in the compilation settings.
 */
 #ifdef HANDLE_MBCS
-#  ifndef WE_HAVE_C99
+#  ifndef HAVE_C99
 /* We can't handle MBCS unless we find a proprietory way, which we'll handle
    as it comes up, since I've no way of knowing this in advance */
 #    error "C environment is pre-C99. Cannot handle MBCS"
@@ -98,7 +101,7 @@
    know in advance what to do about it. Raise a complaint if you hit it ;) */
 #include <langinfo.h>
 /* Standard bools or fake bools... */
-#ifdef WE_HAVE_C99
+#ifdef HAVE_C99
 #  include <stdbool.h>
 #else
 #  define bool int
@@ -107,7 +110,7 @@
 #endif
 /* Deal with dinosaurs. ANSI says there is no snprintf; OTOH everything has
    had one since about 1992. We detect on C99 - if we have it, we have snprintf
-   You can define HAS_SNPRINTF outside to override if you have one really
+   You can define HAVE_SNPRINTF outside to override if you have one really
    even though you're not C99
 
    Actually might get away without this. I'll leave the preprocessing in here
@@ -115,30 +118,18 @@
 
    But we need stdint if we can. Same principle.
 */
-#ifdef WE_HAVE_C99
-#  undef HAS_SNPRINTF
-#  define HAS_SNPRINTF
-#  undef WE_HAVE_STDINT
-#  define WE_HAVE_STDINT
+#ifdef HAVE_C99
+#  undef HAVE_SNPRINTF
+#  define HAVE_SNPRINTF
+#  undef HAVE_STDINT
+#  define HAVE_STDINT
 #endif
 
 /* Sized ints. Get the standard set or fake it. Note you may need to override
    the I64_FORMAT if you're using a 17th century compiler */
-#ifdef WE_HAVE_STDINT
-#  include <stdint.h>
-#  include <inttypes.h>
-#  define I64_FORMAT PRId64
-#else
-#  ifdef INT_64_T
-typedef INT_64_T int64_t;
-#  else
-#    error "No 64 bit type given (-DINT_64_T='long long' maybe?)"
-#  endif
-#  ifndef I64_FORMAT
-#    error "No format for 64 bit type (-DI64_FORMAT='lld' maybe?)"
-#  endif
+#ifndef I64_FORMAT
+#  define I64_FORMAT "lld"
 #endif
-#include "time64.h"
 
 #define NO_PADDING 'N'
 #define DEFAULT_PADDING 'D'
@@ -190,8 +181,8 @@ void format_64_int(char * s, int64_t i) {
 
 size_t strftime64(char * s, size_t max, const char * format,
                   const struct TM * tm) {
-  strftime_state state;
-  size_t output_pos;
+  strftime_state state = copying_input;
+  size_t output_pos = 0;
 
 #ifdef ENCODING_IS_SAFE
   const int enc_is_safe=1;
@@ -213,8 +204,6 @@ size_t strftime64(char * s, size_t max, const char * format,
 #  endif
 #endif
 
-  output_pos=0;
-  state=copying_input;
   char const * format_start_pos=NULL;
   char const * format_width_beginning=NULL;
   int padding=DEFAULT_PADDING;
@@ -390,9 +379,9 @@ size_t strftime64(char * s, size_t max, const char * format,
              it's hence at lease 2 digits. This is debatable, so, give feedback
              if you want it changing... */
 #ifdef I64_FORMAT
-          sprintf(dump_buffer, "%" I64_FORMAT, tm->tm_year/100+19);
+            sprintf(dump_buffer, "%" I64_FORMAT, (Year)tm->tm_year/100+19);
 #else
-          format_64_int(dump_buffer, tm->tm_year/100+19);
+            format_64_int(dump_buffer, (Year)tm->tm_year/100+19);
 #endif
           output_string=dump_buffer;
           default_width=2;
@@ -560,9 +549,9 @@ size_t strftime64(char * s, size_t max, const char * format,
 
         case 'Y':
 #ifdef I64_FORMAT
-          sprintf(dump_buffer, "%" I64_FORMAT, tm->tm_year+1900);
+          sprintf(dump_buffer, "%" I64_FORMAT, (Year)tm->tm_year+1900);
 #else
-          format_64_int(dump_buffer, tm->tm_year/1900);
+          format_64_int(dump_buffer, (Year)tm->tm_year/1900);
 #endif
           output_string=dump_buffer;
           default_width=4;
@@ -681,38 +670,3 @@ size_t strftime64(char * s, size_t max, const char * format,
      above because we ran out of room, and hence forms the return value */
   return output_pos;
 }
-
-#ifdef STRFTIME64_BUILD_MAIN
-
-/* Simple testing main(), this'll be removed on integration to the main
-   suite
-*/
-
-#include <locale.h>
-#include <time.h>
-
-int main(int argc, char**argv) {
-  char ** i;
-  struct TM tm;
-  Time64_T t;
-
-  setlocale(LC_ALL, "");
-
-  t=time(0);
-  localtime64_r(&t, &tm);
-  for(i=argv+1; *i; ++i) {
-    char b[10000];
-    int n;
-
-    n=strftime64(b, 10000, *i, &tm);
-     if(!n)
-       printf("<%s> returned %d\n", *i, n);
-     else
-       printf("<%s> <%s>\n", *i, b);
-   }
-   return 0;
-}
-
-
-#endif
-

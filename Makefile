@@ -7,34 +7,41 @@ WARNINGS = -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-stat
 CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 COMPILE  = $(CC) $(CFLAGS)
 LINK     = $(COMPILE)
+OBJECTS  = time64.o strtime64.o
 
-all : time64.o
+all : $(OBJECTS) Makefile
 
-time64.o : time64_config.h time64.h time64.c Makefile
+time64.h : time64_config.h
 
-t/bench : t/bench.c time64.o
-	$(LINK) time64.o t/bench.c -o $@
+$(OBJECTS) : time64.h Makefile
+
+time64.o : time64.c
+
+strtime64.o : strtime64.c
+
+t/bench : t/bench.c $(OBJECTS)
+	$(LINK) $(OBJECTS) t/bench.c -o $@
 
 bench : t/bench
 	time t/bench
 
-t/localtime_test : t/localtime_test.c time64.o
-	$(LINK) time64.o t/localtime_test.c -o $@
+t/localtime_test : t/localtime_test.c $(OBJECTS)
+	$(LINK) $(OBJECTS) t/localtime_test.c -o $@
 
-t/gmtime_test : t/gmtime_test.c time64.o
-	$(LINK) time64.o t/gmtime_test.c -o $@
+t/gmtime_test : t/gmtime_test.c $(OBJECTS)
+	$(LINK) $(OBJECTS) t/gmtime_test.c -o $@
 
-t/year_limit.t : t/tap.c t/year_limit.t.c time64.o
-	$(LINK) time64.o t/year_limit.t.c -o $@
+t/year_limit.t : t/tap.c t/year_limit.t.c $(OBJECTS)
+	$(LINK) $(OBJECTS) t/year_limit.t.c -o $@
 
-t/negative.t : t/tap.c t/negative.t.c time64.o
-	$(LINK) time64.o t/negative.t.c -o $@
+t/negative.t : t/tap.c t/negative.t.c $(OBJECTS)
+	$(LINK) $(OBJECTS) t/negative.t.c -o $@
 
-t/overflow.t : t/tap.c t/overflow.t.c time64.o
-	$(LINK) time64.o t/overflow.t.c -o $@
+t/overflow.t : t/tap.c t/overflow.t.c $(OBJECTS)
+	$(LINK) $(OBJECTS) t/overflow.t.c -o $@
 
-t/timegm.t : t/tap.c t/timegm.t.c time64.o
-	$(LINK) time64.o t/timegm.t.c -o $@
+t/timegm.t : t/tap.c t/timegm.t.c $(OBJECTS)
+	$(LINK) $(OBJECTS) t/timegm.t.c -o $@
 
 t/safe_year.t : t/tap.c t/safe_year.t.c time64.c
 	$(LINK) t/safe_year.t.c -o $@
@@ -54,6 +61,9 @@ t/ctime64.t : t/tap.c t/ctime64.t.c time64.o
 t/seconds_between_years.t : t/tap.c t/seconds_between_years.t.c time64.c
 	$(LINK) t/seconds_between_years.t.c -o $@
 
+t/strftime.t : t/tap.c t/strftime.t.c $(OBJECTS)
+	$(LINK) $(OBJECTS) t/strftime.t.c -o $@
+
 test : tap_tests localtime_tests
 
 localtime_tests: t/localtime_test t/gmtime_test
@@ -67,7 +77,7 @@ localtime_tests: t/localtime_test t/gmtime_test
 	TZ=Australia/West t/localtime_test | bzip2 -9 > t/oz_test.out.bz2
 	bzdiff -u t/oz_test.out.bz2 t/oztime.out.bz2 | less -F
 
-tap_tests: t/year_limit.t t/negative.t t/overflow.t t/timegm.t t/safe_year.t t/gmtime64.t t/asctime64.t t/ctime64.t
+tap_tests: t/year_limit.t t/negative.t t/overflow.t t/timegm.t t/safe_year.t t/gmtime64.t t/asctime64.t t/ctime64.t t/strftime.t
 	@which prove > /dev/null || (echo 'You need prove (from the Test::Harness perl module) to run these tests'; exit 1)
 	@prove --exec '' t/*.t
 
@@ -77,5 +87,4 @@ clean:
 		t/gmtime_test		\
 		t/*_test.out.bz2	\
 		t/bench			\
-		*.o
-
+		$(OBJECTS)

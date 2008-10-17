@@ -57,6 +57,7 @@ Time64_T   timegm64      (const struct TM *);
 Time64_T   mktime64      (const struct TM *);
 Time64_T   timelocal64   (const struct TM *);
 
+size_t     strftime64    (char *, size_t, const char*, const struct TM *);
 
 /* Not everyone has gm/localtime_r(), provide a replacement */
 #ifdef HAS_LOCALTIME_R

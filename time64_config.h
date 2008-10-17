@@ -29,6 +29,10 @@
 /* #define USE_TM64 */
 
 
+/* HAVE_STDINT */
+#define HAVE_STDINT
+
+
 /* Availability of system functions.
 
    HAS_GMTIME_R
