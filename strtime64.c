@@ -3,15 +3,7 @@
    We provide the strftime and strptime functions in 64 bit form, along
    with their wchar equivalents.
 
-   Doesn't work properly yet. Not integrated with the Makefile.
-
-   To compile:
-   gcc -g -Wall -std=c99 -pedantic -DUSE_TM64 -DSTRFTIME64_BUILD_MAIN \
-     -o strftime64 -g strtime64.c time64.o -lm
-
    You might also want -DHANDLE_MBCS, -DENCODING_IS_[UN]SAFE, see below
-
-   Note you'll need to have USE_TM64 set for time64.o
 
    Not currently "plain" ANSI C. This is because there is no MBCS until C99,
    which in turn means no non-ASCII charsets unless we can crobar them as
