@@ -63,9 +63,15 @@ static const int length_of_year[2] = { 365, 366 };
 static const Year years_in_gregorian_cycle = 400;
 static const int days_in_gregorian_cycle  = (365 * 400) + 100 - 4 + 1;
 
-/* 28 year calendar cycle between 2010 and 2037 */
+/* Year range we can trust the time funcitons with */
+#define MAX_SAFE_YEAR 2037
+#define MIN_SAFE_YEAR 1971
+
+/* 28 year Julian calendar cycle */
 #define SOLAR_CYCLE_LENGTH 28
-static const int safe_years[SOLAR_CYCLE_LENGTH] = {
+
+/* Year cycle from MAX_SAFE_YEAR down. */
+static const int safe_years_high[SOLAR_CYCLE_LENGTH] = {
     2016, 2017, 2018, 2019,
     2020, 2021, 2022, 2023,
     2024, 2025, 2026, 2027,
@@ -75,11 +81,23 @@ static const int safe_years[SOLAR_CYCLE_LENGTH] = {
     2012, 2013, 2014, 2015
 };
 
+/* Year cycle from MIN_SAFE_YEAR up */
+static const int safe_years_low[SOLAR_CYCLE_LENGTH] = {
+    1996, 1997, 1998, 1971,
+    1972, 1973, 1974, 1975,
+    1976, 1977, 1978, 1979,
+    1980, 1981, 1982, 1983,
+    1984, 1985, 1986, 1987,
+    1988, 1989, 1990, 1991,
+    1992, 1993, 1994, 1995,
+};
+
+/* This isn't used, but it's handy to look at */
 static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
     5, 0, 1, 2,     /* 0       2016 - 2019 */
     3, 5, 6, 0,     /* 4  */
-    1, 3, 4, 5,     /* 8  */
-    6, 1, 2, 3,     /* 12 */
+    1, 3, 4, 5,     /* 8       1996 - 1998, 1971*/
+    6, 1, 2, 3,     /* 12      1972 - 1975 */
     4, 6, 0, 1,     /* 16 */
     2, 4, 5, 6,     /* 20      2036, 2037, 2010, 2011 */
     0, 2, 3, 4      /* 24      2012, 2013, 2014, 2015 */
@@ -242,10 +260,20 @@ static Year cycle_offset(Year year)
    It doesn't need the same leap year status since we only care about
    January 1st.
 */
-static int safe_year(Year year)
+static int safe_year(const Year year)
 {
     int safe_year;
-    Year year_cycle = year + cycle_offset(year);
+    Year year_cycle;
+
+    if( year >= MIN_SAFE_YEAR && year <= MAX_SAFE_YEAR ) {
+        return (int)year;
+    }
+
+    year_cycle = year + cycle_offset(year);
+
+    /* safe_years_low is off from safe_years_high by 8 years */
+    if( year < MIN_SAFE_YEAR )
+        year_cycle -= 8;
 
     /* Change non-leap xx00 years to an equivalent */
     if( is_exception_century(year) )
@@ -261,12 +289,17 @@ static int safe_year(Year year)
 
     assert( year_cycle >= 0 );
     assert( year_cycle < SOLAR_CYCLE_LENGTH );
-    safe_year = safe_years[year_cycle];
+    if( year < MIN_SAFE_YEAR )
+        safe_year = safe_years_low[year_cycle];
+    else if( year > MAX_SAFE_YEAR )
+        safe_year = safe_years_high[year_cycle];
+    else
+        assert(0);
 
-    assert(safe_year <= 2037 && safe_year >= 2010);
-    
     TRACE3("# year: %lld, year_cycle: %lld, safe_year: %d\n",
           year, year_cycle, safe_year);
+
+    assert(safe_year <= MAX_SAFE_YEAR && safe_year >= MIN_SAFE_YEAR);
 
     return safe_year;
 }
