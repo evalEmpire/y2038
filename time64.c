@@ -459,6 +459,12 @@ Time64_T mktime64(const struct TM *input_date) {
 }
 
 
+/* Because I think mktime() is a crappy name */
+Time64_T timelocal64(const struct TM *date) {
+    return mktime64(date);
+}
+
+
 struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
 {
     int v_tm_sec, v_tm_min, v_tm_hour, v_tm_mon, v_tm_wday;
