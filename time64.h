@@ -49,6 +49,7 @@ struct TM *gmtime64      (const Time64_T *);
 struct TM *localtime64   (const Time64_T *);
 
 Time64_T   timegm64      (const struct TM *);
+Time64_T   mktime64      (const struct TM *);
 
 
 /* Not everyone has gm/localtime_r(), provide a replacement */

@@ -42,6 +42,12 @@ t/safe_year.t : t/tap.c t/safe_year.t.c time64.c
 t/gmtime64.t : t/tap.c t/gmtime64.t.c time64.o
 	$(LINK) time64.o t/gmtime64.t.c -o $@
 
+t/mktime64.t : t/tap.c t/mktime64.t.c time64.o
+	$(LINK) time64.o t/mktime64.t.c -o $@
+
+t/seconds_between_years.t : t/tap.c t/seconds_between_years.t.c time64.c
+	$(LINK) t/seconds_between_years.t.c -o $@
+
 test : tap_tests localtime_tests
 
 localtime_tests: t/localtime_test t/gmtime_test

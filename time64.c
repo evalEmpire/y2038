@@ -51,7 +51,7 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 /* Spec says except for stftime() and the _r() functions, these
    all return static memory.  Stabbings! */
 static struct TM   Static_Return_Date;
-static char        Static_Return_String[1024];
+/* static char        Static_Return_String[1024]; */
 
 static const int days_in_month[2][12] = {
     {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
@@ -65,9 +65,10 @@ static const int julian_days_by_month[2][12] = {
 
 static const int length_of_year[2] = { 365, 366 };
 
-/* Number of days in a 400 year Gregorian cycle */
-static const Year years_in_gregorian_cycle = 400;
-static const int days_in_gregorian_cycle  = (365 * 400) + 100 - 4 + 1;
+/* Some numbers relating to the gregorian cycle */
+static const Year     years_in_gregorian_cycle   = 400;
+#define               days_in_gregorian_cycle      ((365 * 400) + 100 - 4 + 1)
+static const Time64_T seconds_in_gregorian_cycle = days_in_gregorian_cycle * 60LL * 60LL * 24LL;
 
 /* Year range we can trust the time funcitons with */
 #define MAX_SAFE_YEAR 2037
@@ -161,6 +162,10 @@ static int is_exception_century(Year year)
 }
 
 
+/* timegm() is not in the C or POSIX spec, but it is such a useful
+   extension I would be remiss in leaving it out.  Also I need it
+   for localtime64()
+*/
 Time64_T timegm64(const struct TM *date) {
     int      days    = 0;
     Time64_T seconds = 0;
@@ -407,6 +412,50 @@ struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
         memcpy(result, static_result, sizeof(*result));
         return result;
     }
+}
+
+
+static Time64_T seconds_between_years(Year left_year, Year right_year) {
+    int increment = (left_year > right_year) ? 1 : -1;
+    Time64_T seconds = 0;
+    int cycles;
+
+    if( left_year > 2400 ) {
+        cycles = (left_year - 2400) / 400;
+        left_year -= cycles * 400;
+        seconds   += cycles * seconds_in_gregorian_cycle;
+    }
+
+    while( left_year != right_year ) {
+        seconds += length_of_year[IS_LEAP(right_year - 1900)] * 60 * 60 * 24;
+        right_year += increment;
+    }
+
+    return seconds * increment;
+}
+
+
+Time64_T mktime64(const struct TM *input_date) {
+    struct tm safe_date;
+    struct TM date;
+    Time64_T  time;
+    Year      year = input_date->tm_year + 1900;
+
+    if( MIN_SAFE_YEAR <= year && year <= MAX_SAFE_YEAR ) {
+        copy_TM_to_tm(input_date, &safe_date);
+        return (Time64_T)mktime(&safe_date);
+    }
+
+    /* Have to make the year safe in date else it won't fit in safe_date */
+    date = *input_date;
+    date.tm_year = safe_year(year) - 1900;
+    copy_TM_to_tm(&date, &safe_date);
+
+    time = (Time64_T)mktime(&safe_date);
+
+    time += seconds_between_years(year, (Year)(safe_date.tm_year + 1900));
+
+    return time;
 }
 
 
