@@ -26,6 +26,16 @@ int main(void) {
               "2005 - 2000"
     );
 
+    is_Int64( seconds_between_years( (Year)2400, (Year)2000 ),
+              SECS_PER_YEAR * 303 + SECS_PER_LEAP * 97,
+              "2400 - 2000"
+    );
+
+    is_Int64( seconds_between_years( (Year)2401, (Year)2000 ),
+              SECS_PER_YEAR * 303 + SECS_PER_LEAP * 98,
+              "2401 - 2000"
+    );
+
     done_testing();
     return 0;
 }

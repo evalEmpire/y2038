@@ -16,6 +16,8 @@ int main(void) {
     mktime64_ok((Time64_T)60*60*24*15);
     mktime64_ok((Time64_T)60*60*24*365*143);
     mktime64_ok((Time64_T)-60*60*24*365*143);
+    mktime64_ok((Time64_T)60*60*24*365*433);
+    mktime64_ok((Time64_T)-60*60*24*365*433);
 
     done_testing();
     return 0;
