@@ -47,6 +47,12 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 #include <errno.h>
 #include "time64.h"
 
+
+/* Spec says except for stftime() and the _r() functions, these
+   all return static memory.  Stabbings! */
+static struct TM   Static_Return_Date;
+static char        Static_Return_String[1024];
+
 static const int days_in_month[2][12] = {
     {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
     {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
@@ -144,6 +150,7 @@ static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
 #    define TRACE2(format, var1, var2) ((void)0)
 #    define TRACE3(format, var1, var2, var3) ((void)0)
 #endif
+
 
 static int is_exception_century(Year year)
 {
@@ -617,4 +624,26 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
     assert(check_tm(local_tm));
     
     return local_tm;
+}
+
+
+struct TM *localtime64(const Time64_T *time) {
+    struct TM *err;
+
+    err = localtime64_r(time, &Static_Return_Date);
+    if( err == NULL )
+        return err;
+    else
+        return &Static_Return_Date;
+}
+
+
+struct TM *gmtime64(const Time64_T *time) {
+    struct TM *err;
+
+    err = gmtime64_r(time, &Static_Return_Date);
+    if( err == NULL )
+        return err;
+    else
+        return &Static_Return_Date;
 }

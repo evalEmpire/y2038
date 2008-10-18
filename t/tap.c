@@ -97,6 +97,23 @@ int tm_ok(const struct TM *have,
 
     return ok;
 }
+
+
+int tm_is(const struct TM *have, const struct TM *want, const char *name)
+{
+    int pass = 1;
+
+    pass *= ok( have != NULL, name );
+    pass *= ok( want != NULL, name );
+    pass *= is_Int64((Year)have->tm_year, (Year)want->tm_year,  "tm.year");
+    pass *= is_int(have->tm_mon,  want->tm_mon,   "   month");
+    pass *= is_int(have->tm_mday, want->tm_mday,  "   day");
+    pass *= is_int(have->tm_hour, want->tm_hour,  "   hour");
+    pass *= is_int(have->tm_min,  want->tm_min,   "   min");
+    pass *= is_int(have->tm_sec,  want->tm_sec,   "   sec");
+
+    return pass;
+}
     
 
 void done_testing(void) {

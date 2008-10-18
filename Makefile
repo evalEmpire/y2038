@@ -39,6 +39,9 @@ t/timegm.t : t/tap.c t/timegm.t.c time64.o
 t/safe_year.t : t/tap.c t/safe_year.t.c time64.c
 	$(LINK) t/safe_year.t.c -o $@
 
+t/gmtime64.t : t/tap.c t/gmtime64.t.c time64.o
+	$(LINK) time64.o t/gmtime64.t.c -o $@
+
 test : tap_tests localtime_tests
 
 localtime_tests: t/localtime_test t/gmtime_test
@@ -51,7 +54,7 @@ localtime_tests: t/localtime_test t/gmtime_test
 	TZ=Australia/West t/localtime_test | bzip -9 > t/oz_test.out.bz2
 	bzdiff -u t/oz_test.out.bz2 t/oztime.out.bz2 | less -F
 
-tap_tests: t/year_limit.t t/negative.t t/overflow.t t/timegm.t t/safe_year.t
+tap_tests: t/year_limit.t t/negative.t t/overflow.t t/timegm.t t/safe_year.t t/gmtime64.t
 	@perl -MTest::Harness -wle 'if( $$Test::Harness::VERSION < 3.00 ) {	\
 		print "You need the Test::Harness 3 Perl module to run these tests";	\
 	        exit 1 \
