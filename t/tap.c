@@ -27,18 +27,13 @@ void skip_all(const char *reason) {
     exit(0);
 }
 
-int ok(const int test, const char *message, ...) {
-    va_list args;
 
+int do_test(const int test, const char *message, va_list args) {
     Test_Count++;
-
-    va_start(args, message);
 
     printf("%s %d ", (test ? "ok" : "not ok"), Test_Count);
     vprintf(message, args);
     printf("\n");
-
-    va_end(args);
 
     if( !test ) {
         diag("Failed test");
@@ -46,14 +41,29 @@ int ok(const int test, const char *message, ...) {
     }
 
     return test;
+}    
+
+
+int ok(const int test, const char *message, ...) {
+    va_list args;
+    int pass;
+
+    va_start(args, message);
+
+    pass = do_test(test, message, args);
+
+    va_end(args);
+
+    return pass;
 }
+
 
 int is_int(const int have, const int want, const char *message, ...) {
     int test = (have == want);
     va_list args;
     va_start(args, message);
 
-    ok( test, message, args );
+    do_test( test, message, args );
 
     if( !test ) {
         diag("have: %d", have);
@@ -66,21 +76,29 @@ int is_int(const int have, const int want, const char *message, ...) {
 }
 
 
-int is_Int64(const Int64 have, const Int64 want, const char *name) {
+int is_Int64(const Int64 have, const Int64 want, const char *name, ...) {
     int test = (have == want);
-    ok( test, name );
+
+    va_list args;
+    va_start(args, name);
+
+    do_test( test, name, args );
 
     if( !test ) {
         diag("have: %lld", have);
         diag("want: %lld", want);
     }
 
+    va_end(args);
+
     return test;
 }
+
 
 int is_not_null(void *arg, const char *name) {
     return( ok( arg != NULL, name ) );
 }
+
 
 int tm_ok(const struct TM *have,
           const int year, const int mon, const int mday,
