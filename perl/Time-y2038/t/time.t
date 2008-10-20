@@ -10,6 +10,10 @@ BEGIN {
     use_ok 'Time::y2038';
 }
 
+# Try to set the time zone so we can reliably test localtime().
+local $ENV{TZ} = 'US/Pacific';
+my $Test_Localtime = localtime(0) eq 'Wed Dec 31 16:00:00 1969';
+
 
 # Test that we match the core's results inside the safe range.
 {
@@ -29,6 +33,22 @@ BEGIN {
 {
     is_deeply( [gmtime(2**52)],  [16, 48, 3, 6, 11, 142713460, 6, 340, 0], 'gmtime(2**52)' );
     is_deeply( [gmtime(-2**52)], [44, 11, 20, 25, 0, -142713321, 1, 24, 0], 'gmtime(-2**52)' );
+
+    is( gmtime(2**52),  'Sat Dec  6 03:48:16 142715360' );
+    is( gmtime(-2**52), 'Mon Jan 25 20:11:44 -142711421' );
+}
+
+
+SKIP: {
+    skip "localtime() tests specific to US/Pacific time zone", 6;
+
+    is_deeply( [localtime(2**52)],  [16, 48, 19, 5, 11, 142713460, 5, 339, 0], 'localtime(2**52)' );
+    is_deeply( [localtime(-2**52)], [44, 11, 12, 25, 0, -142713321, 1, 24, 0], 'localtime(-2**52)' );
+    is_deeply( [localtime(1224479316)], [36, 8, 22, 19, 9, 108, 0, 292, 1], 'localtime() w/dst' );
+
+    is( localtime(2**52),      'Fri Dec  5 19:48:16 142715360' );
+    is( localtime(-2**52),     'Mon Jan 25 12:11:44 -142711421' );
+    is( localtime(1224479368), 'Sun Oct 19 22:08:36 2008' );
 }
 
 
@@ -61,11 +81,11 @@ for my $name (qw(gmtime localtime)) {
     my $huge_time = sprintf "%.0f", 2**65;
 #line 58
     warning_like {
-        my $date = $func->($huge_time);
+        is $func->($huge_time), undef;
     } qr/^\Q$name($huge_time) can not be represented at $0 line 59\E/;
 
 #line 63
     warning_like {
-        my $date = $func->(-$huge_time);
+        is $func->(-$huge_time), undef;
     } qr/^\Q$name(-$huge_time) can not be represented at $0 line 64\E/;
 }
