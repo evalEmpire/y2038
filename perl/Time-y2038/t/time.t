@@ -40,7 +40,7 @@ my $Test_Localtime = localtime(0) eq 'Wed Dec 31 16:00:00 1969';
 
 
 SKIP: {
-    skip "localtime() tests specific to US/Pacific time zone", 6;
+    skip "localtime() tests specific to US/Pacific time zone", 6 unless $Test_Localtime;
 
     is_deeply( [localtime(2**52)],  [16, 48, 19, 5, 11, 142713460, 5, 339, 0], 'localtime(2**52)' );
     is_deeply( [localtime(-2**52)], [44, 11, 12, 25, 0, -142713321, 1, 24, 0], 'localtime(-2**52)' );
@@ -48,7 +48,7 @@ SKIP: {
 
     is( localtime(2**52),      'Fri Dec  5 19:48:16 142715360' );
     is( localtime(-2**52),     'Mon Jan 25 12:11:44 -142711421' );
-    is( localtime(1224479368), 'Sun Oct 19 22:08:36 2008' );
+    is( localtime(1224479316), 'Sun Oct 19 22:08:36 2008' );
 }
 
 
