@@ -16,7 +16,7 @@ my $build = Module::Build->new(
     include_dirs        => ['y2038'],
     c_source            => 'y2038',
 
-#    extra_compiler_flags => "-Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion",
+#    extra_compiler_flags => "-g -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion",
 
     PL_files => {
         'munge_config'  => 'y2038/time64_config.h'
