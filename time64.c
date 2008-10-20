@@ -167,31 +167,43 @@ static int is_exception_century(Year year)
    for localtime64()
 */
 Time64_T timegm64(const struct TM *date) {
-    int      days    = 0;
+    Time64_T days    = 0;
     Time64_T seconds = 0;
     Year     year;
+    Year     orig_year = (Year)date->tm_year;
+    int      cycles  = 0;
 
-    if( date->tm_year > 70 ) {
+    if( orig_year > 100 ) {
+        cycles = (orig_year - 100) / 400;
+        orig_year -= cycles * 400;
+        days      += (Time64_T)cycles * days_in_gregorian_cycle;
+    }
+    else if( orig_year < -300 ) {
+        cycles = (orig_year - 100) / 400;
+        orig_year -= cycles * 400;
+        days      += (Time64_T)cycles * days_in_gregorian_cycle;
+    }
+    TRACE3("# timegm/ cycles: %d, days: %lld, orig_year: %lld\n", cycles, days, orig_year);
+
+    if( orig_year > 70 ) {
         year = 70;
-        while( year < date->tm_year ) {
+        while( year < orig_year ) {
             days += length_of_year[IS_LEAP(year)];
             year++;
         }
     }
-    else if ( date->tm_year < 70 ) {
+    else if ( orig_year < 70 ) {
         year = 69;
         do {
             days -= length_of_year[IS_LEAP(year)];
             year--;
-        } while( year >= date->tm_year );
+        } while( year >= orig_year );
     }
 
-    days += julian_days_by_month[IS_LEAP(date->tm_year)][date->tm_mon];
+    days += julian_days_by_month[IS_LEAP(orig_year)][date->tm_mon];
     days += date->tm_mday - 1;
 
-    /* Avoid overflowing the days integer */
-    seconds = days;
-    seconds = seconds * 60 * 60 * 24;
+    seconds = days * 60 * 60 * 24;
 
     seconds += date->tm_hour * 60 * 60;
     seconds += date->tm_min * 60;
@@ -423,6 +435,11 @@ static Time64_T seconds_between_years(Year left_year, Year right_year) {
     if( left_year > 2400 ) {
         cycles = (left_year - 2400) / 400;
         left_year -= cycles * 400;
+        seconds   += cycles * seconds_in_gregorian_cycle;
+    }
+    else if( left_year < 1600 ) {
+        cycles = (left_year - 1600) / 400;
+        left_year += cycles * 400;
         seconds   += cycles * seconds_in_gregorian_cycle;
     }
 

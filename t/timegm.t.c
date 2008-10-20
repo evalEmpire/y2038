@@ -54,6 +54,14 @@ int main(void) {
     gmtime64_r(&time, &date);
     is_Int64( timegm64(&date), time, "timegm64(-302216279)" );
 
+    time = 0x000FFFFFFFFFFFFFLL;
+    gmtime64_r(&time, &date);
+    is_Int64( timegm64(&date), time, "timegm64(2**52)" );
+
+    time = -0x000FFFFFFFFFFFFFLL;
+    gmtime64_r(&time, &date);
+    is_Int64( timegm64(&date), time, "timegm64(-2**52)" );
+
     done_testing();
     return(0);
 }
