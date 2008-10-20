@@ -67,4 +67,40 @@ The following is always true:
 
 Like C<timegm()>, but interprets the date in the current time zone.
 
+
+=head1 LIMITATIONS
+
+The safe range of times is +/ 2**52 (about 142 million years).
+
+Although the underlying time library can handle times from -2**63 to
+2**63-1 (about +/- 292 billion years) Perl uses floating point numbers
+internally and so accuracy degrates after 2**52.
+
+
+=head1 BUGS & FEEDBACK
+
+See F<http://rt.cpan.org> to report and view bugs.
+
+If you like the module, please drop the author an email.
+
+
+=head1 AUTHOR
+
+Michael G Schwern <schwern@pobox.com>
+
+
+=head1 LICENSE & COPYRIGHT
+
+Copyright 2008 Michael G Schwern
+
+This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+See F<http://www.perl.com/perl/misc/Artistic.html>
+
+
+=head1 SEE ALSO
+
+The y2038 project at F<http://y2038.googlecode.com/>
+
 =cut
