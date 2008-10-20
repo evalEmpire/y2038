@@ -27,6 +27,7 @@ my $build = Module::Build->new(
     },
 
     build_requires      => {
+        'Module::Build'         => '0.2808',
         'Test::More'            => 0.82,
         'ExtUtils::CBuilder'    => 0,
     },
