@@ -31,6 +31,9 @@ On many computers, Perl's time functions will not work past the year
 Time::y2038 provides replacements for those functions which will work
 accurately +/1 142 million years.
 
+This only imports the functions into your namespace.  To replace it
+everywhere, see L<Time::y2038::Everywhere>.
+
 Replaces the following functions:
 
 =head3 gmtime()
@@ -100,6 +103,8 @@ See F<http://www.perl.com/perl/misc/Artistic.html>
 
 
 =head1 SEE ALSO
+
+L<Time::y2038::Everywhere> overrides localtime() and gmtime() across the whole program.
 
 The y2038 project at F<http://y2038.googlecode.com/>
 
