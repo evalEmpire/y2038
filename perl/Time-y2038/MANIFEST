@@ -1,8 +1,10 @@
 Build.PL
+Changes
 lib/Time/y2038.pm
 lib/Time/y2038.xs
 lib/Time/y2038/Everywhere.pm
 MANIFEST			This list of files
+META.yml
 munge_config
 t/everywhere.t
 t/time.t
@@ -11,4 +13,3 @@ typemap
 y2038/time64.c
 y2038/time64.h
 y2038/time64_config.h.in
-META.yml
