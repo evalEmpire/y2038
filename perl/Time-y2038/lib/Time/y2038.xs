@@ -176,3 +176,54 @@ localtime(...)
                            year);
             myPUSHs(tsv);
         }
+
+
+double
+timegm(...)
+     INIT:
+         struct TM date;
+         Time64_T when;
+     CODE:
+         if( items < 6 )
+             croak("Usage: timegm($sec, $min, $hour, $mday, $month, $year)");
+
+         date.tm_sec  = SvIV(ST(0));
+         date.tm_min  = SvIV(ST(1));
+         date.tm_hour = SvIV(ST(2));
+         date.tm_mday = SvIV(ST(3));
+         date.tm_mon  = SvIV(ST(4));
+         date.tm_year = (Year)SvNV(ST(5));
+
+         when = timegm64(&date);
+
+         RETVAL = (double)when;
+
+     OUTPUT:
+         RETVAL
+
+
+double
+timelocal(...)
+     INIT:
+         struct TM date;
+         Time64_T when;
+     CODE:
+         if( items < 6 )
+             croak("Usage: timelocal($sec, $min, $hour, $mday, $month, $year)");
+
+         date.tm_sec  = SvIV(ST(0));
+         date.tm_min  = SvIV(ST(1));
+         date.tm_hour = SvIV(ST(2));
+         date.tm_mday = SvIV(ST(3));
+         date.tm_mon  = SvIV(ST(4));
+         date.tm_year = (Year)SvNV(ST(5));
+
+         /* Make sure mktime() tries to figure out the dst for us */
+         date.tm_isdst = -1;
+
+         when = mktime64(&date);
+
+         RETVAL = (double)when;
+
+     OUTPUT:
+         RETVAL
