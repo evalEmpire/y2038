@@ -12,14 +12,28 @@ MODULE = Time::y2038                PACKAGE = Time::y2038
 PROTOTYPES: ENABLE
 
 void
-localtime(time)
-    const Time64_T time
+localtime(...)
     PROTOTYPE: ;$
     INIT:
+        Time64_T when;
         struct TM *err;
         struct TM date;
     PPCODE:
-        err = localtime64_r(&time, &date);
+        if( GIMME_V == G_VOID ) {
+            warn("Useless use of localtime() in void context");
+            XSRETURN_EMPTY;
+        }
+
+        if( items == 0 ) {
+            time_t small_when;
+            time(&small_when);
+            when = (Time64_T)small_when;
+        }
+        else {
+            when = (Time64_T)SvNV(ST(0));
+        }
+
+        err = localtime64_r(&when, &date);
 
         if( err == NULL ) {
             warn("localtime() could not represent the time");
@@ -39,14 +53,28 @@ localtime(time)
 
 
 void
-gmtime(time)
-    const Time64_T time
+gmtime(...)
     PROTOTYPE: ;$
     INIT:
+        Time64_T when;
         struct TM *err;
         struct TM date;
     PPCODE:
-        err = gmtime64_r(&time, &date);
+        if( GIMME_V == G_VOID ) {
+            warn("Useless use of gmtime() in void context");
+            XSRETURN_EMPTY;
+        }
+
+        if( items == 0 ) {
+            time_t small_when;
+            time(&small_when);
+            when = (Time64_T)small_when;
+        }
+        else {
+            when = (Time64_T)SvNV(ST(0));
+        }
+
+        err = gmtime64_r(&when, &date);
 
         if( err == NULL ) {
             warn("gmtime() could not represent the time");
