@@ -50,4 +50,17 @@ for my $name (qw(gmtime localtime)) {
     # Test with no args.
     # Ignore the minutes and seconds in case they get run at a minute/second boundry.
     is_deeply( [($func->())[2..8]],    [($func->(time))[2..8]], "$name()" );
+
+
+    # Test too big or small a time.
+    my $huge_time = sprintf "%.0f", 2**65;
+#line 58
+    warning_like {
+        my $date = $func->($huge_time);
+    } qr/^\Q$name($huge_time) can not be represented at $0 line 59\E/;
+
+#line 63
+    warning_like {
+        my $date = $func->(-$huge_time);
+    } qr/^\Q$name(-$huge_time) can not be represented at $0 line 64\E/;
 }
