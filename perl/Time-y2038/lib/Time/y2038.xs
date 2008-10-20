@@ -6,8 +6,16 @@
 
 #include "time64.h"
 
-#define myPUSHi(int)   (PUSHs(sv_2mortal(newSViv(int))));
-#define myPUSHn(num)   (PUSHs(sv_2mortal(newSVnv(num))));
+#define myPUSHi(int)   PUSHs(sv_2mortal(newSViv(int)));
+#define myPUSHn(num)   PUSHs(sv_2mortal(newSVnv(num)));
+#define myPUSHs(str)   PUSHs(sv_2mortal(str));
+
+
+static const char * const dayname[] =
+    {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+static const char * const monname[] =
+    {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 
 int about_eq(double left, double right, double epsilon) {
@@ -69,16 +77,36 @@ gmtime(...)
             XSRETURN_EMPTY;
         }
 
-        EXTEND(SP, 9);
-        myPUSHi(date.tm_sec);
-	myPUSHi(date.tm_min);
-	myPUSHi(date.tm_hour);
-	myPUSHi(date.tm_mday);
-	myPUSHi(date.tm_mon);
-	myPUSHn((double)date.tm_year);
-	myPUSHi(date.tm_wday);
-	myPUSHi(date.tm_yday);
-	myPUSHi(date.tm_isdst);
+        if( GIMME_V == G_ARRAY ) {
+            EXTEND(SP, 9);
+            myPUSHi(date.tm_sec);
+            myPUSHi(date.tm_min);
+            myPUSHi(date.tm_hour);
+            myPUSHi(date.tm_mday);
+            myPUSHi(date.tm_mon);
+            myPUSHn((double)date.tm_year);
+            myPUSHi(date.tm_wday);
+            myPUSHi(date.tm_yday);
+            myPUSHi(date.tm_isdst);
+        }
+        else {
+            SV *tsv;
+            /* XXX newSVpvf()'s %lld type is broken, so cheat with a double */
+            double year = (double)date.tm_year + 1900;
+
+            EXTEND(SP, 1);
+            EXTEND_MORTAL(1);
+
+            tsv = newSVpvf("%s %s %2d %02d:%02d:%02d %.0f",
+                           dayname[date.tm_wday],
+                           monname[date.tm_mon],
+                           date.tm_mday,
+                           date.tm_hour,
+                           date.tm_min,
+                           date.tm_sec,
+                           year);
+            myPUSHs(tsv);
+        }
 
 
 void
@@ -118,13 +146,33 @@ localtime(...)
             XSRETURN_EMPTY;
         }
 
-        EXTEND(SP, 9);
-        myPUSHi(date.tm_sec);
-	myPUSHi(date.tm_min);
-	myPUSHi(date.tm_hour);
-	myPUSHi(date.tm_mday);
-	myPUSHi(date.tm_mon);
-	myPUSHn((double)date.tm_year);
-	myPUSHi(date.tm_wday);
-	myPUSHi(date.tm_yday);
-	myPUSHi(date.tm_isdst);
+        if( GIMME_V == G_ARRAY ) {
+            EXTEND(SP, 9);
+            myPUSHi(date.tm_sec);
+            myPUSHi(date.tm_min);
+            myPUSHi(date.tm_hour);
+            myPUSHi(date.tm_mday);
+            myPUSHi(date.tm_mon);
+            myPUSHn((double)date.tm_year);
+            myPUSHi(date.tm_wday);
+            myPUSHi(date.tm_yday);
+            myPUSHi(date.tm_isdst);
+        }
+        else {
+            SV *tsv;
+            /* XXX newSVpvf()'s %lld type is broken, so cheat with a double */
+            double year = (double)date.tm_year + 1900;
+
+            EXTEND(SP, 1);
+            EXTEND_MORTAL(1);
+
+            tsv = newSVpvf("%s %s %2d %02d:%02d:%02d %.0f",
+                           dayname[date.tm_wday],
+                           monname[date.tm_mon],
+                           date.tm_mday,
+                           date.tm_hour,
+                           date.tm_min,
+                           date.tm_sec,
+                           year);
+            myPUSHs(tsv);
+        }

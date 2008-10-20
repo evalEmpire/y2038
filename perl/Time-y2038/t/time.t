@@ -18,6 +18,11 @@ BEGIN {
 
     is_deeply( [gmtime(2**30)],    [CORE::gmtime(2**30)],    'gmtime(2**30)' );
     is_deeply( [localtime(2**30)], [CORE::localtime(2**30)], 'localtimetime(2**30)' );
+
+    is gmtime(0),        CORE::gmtime(0),        'scalar gmtime(0)';
+    is localtime(0),     CORE::localtime(0),     'scalar localtime(0)';
+    is gmtime(2**30),    CORE::gmtime(2**30),    'scalar gmtime(2**30)';
+    is localtime(2**30), CORE::localtime(2**30), 'scalar localtime(2**30)';
 }
 
 
