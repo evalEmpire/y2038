@@ -67,9 +67,27 @@ The following is always true:
 =head3 timelocal()
 
     my $time = timelocal($sec, $min, $hour, $mday, $month, $year);
+    my $time = timelocal($sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst);
 
 Like C<timegm()>, but interprets the date in the current time zone.
 
+C<timelocal()> will normally figure out if daylight savings time is in
+effect, but if $isdst is given this will override that check.  This is
+mostly useful to resolve ambiguous times around "fall back" when the
+hour between 1am and 2am occurs twice.
+
+    # Sun Nov  4 00:59:59 2007
+    print timelocal(59, 59, 0, 4, 10, 107);  # 1194163199
+
+    # Sun Nov  4 01:00:00 2007 DST, one second later
+    print timelocal(0, 0, 1, 4, 10, 107, undef, undef, 1);  # 1194163200
+
+    # Sun Nov  4 01:00:00 2007 no DST, one hour later
+    print timelocal(0, 0, 1, 4, 10, 107, undef, undef, 0);  # 1194166800
+
+
+$wday and $yday are ignored.  They are only there for compatibility
+with the return value of C<localtime()>.
 
 =head1 LIMITATIONS
 

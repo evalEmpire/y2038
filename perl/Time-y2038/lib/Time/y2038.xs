@@ -218,8 +218,7 @@ timelocal(...)
          date.tm_mon  = SvIV(ST(4));
          date.tm_year = (Year)SvNV(ST(5));
 
-         /* Make sure mktime() tries to figure out the dst for us */
-         date.tm_isdst = -1;
+         date.tm_isdst = items >= 9 ? SvIV(ST(8)) : -1;
 
          when = mktime64(&date);
 
