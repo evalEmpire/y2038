@@ -1,2 +1,8 @@
+20081022
+  Test Fixes
+  * Compare times using numeric equality instead of string equality to avoid
+    Perl messing up on big numbers.
+
+
 20081020  Mon Oct 20 00:10:51 PDT 2008
   First release
