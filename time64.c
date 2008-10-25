@@ -700,22 +700,10 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
 
 
 struct TM *localtime64(const Time64_T *time) {
-    struct TM *err;
-
-    err = localtime64_r(time, &Static_Return_Date);
-    if( err == NULL )
-        return err;
-    else
-        return &Static_Return_Date;
+    return localtime64_r(time, &Static_Return_Date);
 }
 
 
 struct TM *gmtime64(const Time64_T *time) {
-    struct TM *err;
-
-    err = gmtime64_r(time, &Static_Return_Date);
-    if( err == NULL )
-        return err;
-    else
-        return &Static_Return_Date;
+    return gmtime64_r(time, &Static_Return_Date);
 }
