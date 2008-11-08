@@ -19,9 +19,17 @@ unless( $cb->have_compiler ) {
 sub test_time_limits {
     my $build = shift;
 
+    warn "Building a program to test the range of your system time functions...\n";
+
     my $obj = $cb->compile(source => "check_max.c", include_dirs => ['y2038']);
     my $exe = $cb->link_executable(objects => $obj);
+
+    warn "  and running it...\n";
+
     my @maxes = `./$exe`;
+
+    warn "  Done.\n";
+
     my %limits;
     for my $line (@maxes) {
         my($key, $val) = split /\s+/, $line;
@@ -76,6 +84,8 @@ my $build = Module::Build->new(
 
 my %limits = test_time_limits;
 for my $key (keys %limits) {
+    my $val = $limits{$key};
+    warn sprintf "%15s:  %d\n", $key, $val;
     $build->notes($key, $limits{$key});
 }
 
