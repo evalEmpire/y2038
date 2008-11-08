@@ -53,7 +53,7 @@ void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name )
         }
     } while(time_change > 0);
 
-    printf("%20s max %.0f\n", func_name, my_difftime(last_time, Time_Zero));
+    printf("%s_max %.0f\n", func_name, my_difftime(last_time, Time_Zero));
 }
 
 
@@ -98,7 +98,7 @@ void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name )
         }
     } while(time_change < 0);
 
-    printf("%20s min %.0f\n", func_name, my_difftime(last_time, Time_Zero));
+    printf("%s_min %.0f\n", func_name, my_difftime(last_time, Time_Zero));
 }
 
 

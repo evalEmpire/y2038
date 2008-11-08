@@ -1,6 +1,11 @@
 #!/usr/bin/perl -w
 
 use Config;
+use Module::Build;
+
+my $build = Module::Build->current;
+
+my %config = (%Config, $build->notes);
 
 my $output_file = shift;
 my $input_file  = $output_file . ".in";
@@ -17,10 +22,10 @@ print $output_fh <<"END";
 END
 
 while(<$input_fh>) {
-    my $matched = s{%%(.*)%%}{$Config{$1}}g;
+    my $matched = s{%%(.*)%%}{$config{$1}}g;
 
-    if( $matched and !defined $Config{$1} and !length $Config{$1} ) {
-        warn "Your configuration is missing \$Config{$1}.\n".
+    if( $matched and !defined $config{$1} and !length $config{$1} ) {
+        warn "Your configuration is missing \$config{$1}.\n".
              "Please edit $output_file by hand to fix.\n"
     }
 

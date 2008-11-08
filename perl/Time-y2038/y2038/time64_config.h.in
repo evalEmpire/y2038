@@ -75,9 +75,9 @@
    can handle.  We will use your system functions if the time falls
    inside these ranges.
 */
-#define SYSTEM_LOCALTIME_MAX     2147483647
-#define SYSTEM_LOCALTIME_MIN     0
-#define SYSTEM_GMTIME_MAX        2147483647
-#define SYSTEM_GMTIME_MIN        0
+#define SYSTEM_LOCALTIME_MAX     %%localtime_max%%
+#define SYSTEM_LOCALTIME_MIN     %%localtime_min%%
+#define SYSTEM_GMTIME_MAX        %%gmtime_max%%
+#define SYSTEM_GMTIME_MIN        %%gmtime_min%%
 
 #endif /* TIME64_CONFIG_H */
