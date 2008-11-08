@@ -1,4 +1,4 @@
-20081022
+20081106  Thu Nov  6 19:01:22 PST 2008
   Portability Improvements
   * Test the system time.h's limits and use them rather than the safe
     1970-2038 range.
