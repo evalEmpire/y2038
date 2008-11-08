@@ -44,3 +44,6 @@
 check_max$
 lib/Time/y2038\.c
 y2038/time64_config.h$
+
+# Avoid our own dists
+^Time-y2038-

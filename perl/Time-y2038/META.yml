@@ -1,6 +1,6 @@
 ---
 name: Time-y2038
-version: 20081020
+version: 20081106
 author:
   - 'Michael G Schwern <schwern@pobox.com>'
 abstract: Versions of Perl's time functions which work beyond 2038
@@ -16,14 +16,14 @@ build_requires:
   Module::Build: 0.2808
   Test::Exception: 0.27
   Test::More: 0.62
-  Test::Warn: 0.10
+  Test::Warn: 0.11
 provides:
   Time::y2038:
     file: lib/Time/y2038.pm
-    version: 20081020
+    version: 20081106
   Time::y2038::Everywhere:
     file: lib/Time/y2038/Everywhere.pm
-    version: 20081020
+    version: 20081106
 generated_by: Module::Build version 0.3
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
