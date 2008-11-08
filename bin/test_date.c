@@ -25,6 +25,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    printf("sizeof time_t: %ld, tm.tm_year: %ld\n", sizeof(time_t), sizeof(gmdate->tm_year));
+
     number = strtoll(argv[1], NULL, 0);
     time = (time_t)number;
 
