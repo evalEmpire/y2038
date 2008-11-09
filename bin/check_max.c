@@ -20,8 +20,8 @@ double my_difftime(time_t left, time_t right) {
 
 void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name ) {
     struct tm *date;
-    time_t time = 0;
-    time_t last_time = 0;
+    time_t time        = 0;
+    time_t last_time   = 0;
     time_t time_change = Time_Max;
 
     /* Binary search for the exact failure point */
@@ -46,8 +46,8 @@ void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name )
 
 void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name ) {
     struct tm *date;
-    time_t time = -1;
-    time_t last_time = 0;
+    time_t time        = 0;
+    time_t last_time   = 0;
     time_t time_change = Time_Min;
 
     /* Binary search for the exact failure point */
