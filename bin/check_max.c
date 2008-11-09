@@ -79,8 +79,8 @@ void guess_time_limits_from_types(void) {
     else if( sizeof(time_t) >= 8 ) {
         if( sizeof(Test_TM.tm_year) == 4 ) {
             /* y2**31-1 bug */
-            Time_Max =  67768038400720895LL;
-            Time_Min = -67768038400720895LL;
+            Time_Max =  67768036160140799LL;
+            Time_Min = -67768036191676800LL;
         }
         else {
             /* All the way out to 2**63-1 */
