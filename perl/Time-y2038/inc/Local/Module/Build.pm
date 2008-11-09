@@ -39,7 +39,7 @@ sub note_time_limits {
         }
     }
 
-    for my $key (keys %limits) {
+    for my $key (sort { $a cmp $b } keys %limits) {
         my $val = $limits{$key};
         warn sprintf "%15s:  %d\n", $key, $val;
         $self->notes($key, $limits{$key});
