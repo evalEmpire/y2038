@@ -20,53 +20,53 @@ double my_difftime(time_t left, time_t right) {
 
 void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name ) {
     struct tm *date;
-    time_t time        = 0;
-    time_t last_time   = 0;
+    time_t time        = Time_Max;
+    time_t good_time   = 0;
     time_t time_change = Time_Max;
 
     /* Binary search for the exact failure point */
     do {
-        time += time_change;
-
         date = (*date_func)(&time);
 
+        time_change /= 2;
+
         /* date_func() broke or tm_year overflowed or time_t overflowed */
-        if(date == NULL || date->tm_year < 69 || time < last_time) {
-            time = last_time;
-            time_change = time_change / 2;
+        if(date == NULL || date->tm_year < 69 || time < good_time) {
+            time -= time_change;
         }
         else {
-            last_time = time;
+            good_time = time;
+            time += time_change;
         }
-    } while(time_change > 0);
+    } while(time_change > 0 && good_time <= Time_Max);
 
-    printf("%s_max %.0f\n", func_name, my_difftime(last_time, Time_Zero));
+    printf("%s_max %.0f\n", func_name, my_difftime(good_time, Time_Zero));
 }
 
 
 void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name ) {
     struct tm *date;
-    time_t time        = 0;
-    time_t last_time   = 0;
+    time_t time        = Time_Min;
+    time_t good_time   = 0;
     time_t time_change = Time_Min;
 
     /* Binary search for the exact failure point */
     do {
-        time += time_change;
-
         date = (*date_func)(&time);
 
+        time_change /= 2;
+
         /* gmtime() broke or tm_year overflowed or time_t overflowed */
-        if(date == NULL || date->tm_year > 70 || time > last_time) {
-            time = last_time;
-            time_change = time_change / 2;
+        if(date == NULL || date->tm_year > 70 || time > good_time) {
+            time -= time_change;
         }
         else {
-            last_time = time;
+            good_time = time;
+            time += time_change;
         }
-    } while(time_change < 0);
+    } while((time_change > 0) && (good_time >= Time_Min));
 
-    printf("%s_min %.0f\n", func_name, my_difftime(last_time, Time_Zero));
+    printf("%s_min %.0f\n", func_name, my_difftime(good_time, Time_Zero));
 }
 
 
@@ -77,6 +77,8 @@ void guess_time_limits_from_types(void) {
         Time_Min = -2147483648;
     }
     else if( sizeof(time_t) >= 8 ) {
+        /* The compiler might warn about overflowing in the assignments
+           below.  Don't worry, these won't get run in that case */
         if( sizeof(Test_TM.tm_year) == 4 ) {
             /* y2**31-1 bug */
             Time_Max =  67768036160140799LL;
