@@ -51,20 +51,18 @@ t/seconds_between_years.t : t/tap.c t/seconds_between_years.t.c time64.c
 test : tap_tests localtime_tests
 
 localtime_tests: t/localtime_test t/gmtime_test
-	@which bzdiff > /dev/null || (echo "You need bzdiff to run these tests"; exit 1)
-	@which less   > /dev/null || (echo "You need less to run these tests";   exit 1)
-	TZ=Canada/Eastern t/gmtime_test | bzip -9 > t/gmtime_test.out.bz2
+	@which bzdiff > /dev/null || (echo 'You need bzdiff to run these tests'; exit 1)
+	@which less   > /dev/null || (echo 'You need less to run these tests';   exit 1)
+	@echo "On failure, these tests will produce a diff between the failed and expected results.  If they pass they'll be quiet."
+	TZ=Canada/Eastern t/gmtime_test | bzip2 -9 > t/gmtime_test.out.bz2
 	bzdiff -u t/gmtime_test.out.bz2 t/gmtime.out.bz2 | less -F
-	TZ=Canada/Eastern t/localtime_test | bzip -9 > t/eastern_test.out.bz2
+	TZ=Canada/Eastern t/localtime_test | bzip2 -9 > t/eastern_test.out.bz2
 	bzdiff -u t/eastern_test.out.bz2 t/eastern.out.bz2 | less -F
-	TZ=Australia/West t/localtime_test | bzip -9 > t/oz_test.out.bz2
+	TZ=Australia/West t/localtime_test | bzip2 -9 > t/oz_test.out.bz2
 	bzdiff -u t/oz_test.out.bz2 t/oztime.out.bz2 | less -F
 
 tap_tests: t/year_limit.t t/negative.t t/overflow.t t/timegm.t t/safe_year.t t/gmtime64.t
-	@perl -MTest::Harness -wle 'if( $$Test::Harness::VERSION < 3.00 ) {	\
-		print "You need the Test::Harness 3 Perl module to run these tests";	\
-	        exit 1 \
-	}'
+	@which prove > /dev/null || (echo 'You need prove (from the Test::Harness perl module) to run these tests'; exit 1)
 	@prove --exec '' t/*.t
 
 clean:
