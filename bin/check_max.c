@@ -26,19 +26,22 @@ void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name )
 
     /* Binary search for the exact failure point */
     do {
+        printf("# Trying %s(%d) max...", func_name, time);
         date = (*date_func)(&time);
 
         time_change /= 2;
 
         /* date_func() broke or tm_year overflowed or time_t overflowed */
         if(date == NULL || date->tm_year < 69 || time < good_time) {
+            printf(" failed\n");
             time -= time_change;
         }
         else {
+            printf(" success\n");
             good_time = time;
             time += time_change;
         }
-    } while(time_change > 0 && good_time <= Time_Max);
+    } while(time_change > 0 && good_time < Time_Max);
 
     printf("%s_max %.0f\n", func_name, my_difftime(good_time, Time_Zero));
 }
@@ -52,19 +55,22 @@ void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name )
 
     /* Binary search for the exact failure point */
     do {
+        printf("# Trying %s(%d) max...", func_name, time);
         date = (*date_func)(&time);
 
         time_change /= 2;
 
         /* gmtime() broke or tm_year overflowed or time_t overflowed */
         if(date == NULL || date->tm_year > 70 || time > good_time) {
+            printf(" failed\n");
             time -= time_change;
         }
         else {
+            printf(" success\n");
             good_time = time;
             time += time_change;
         }
-    } while((time_change > 0) && (good_time >= Time_Min));
+    } while((time_change > 0) && (good_time > Time_Min));
 
     printf("%s_min %.0f\n", func_name, my_difftime(good_time, Time_Zero));
 }
