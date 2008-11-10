@@ -55,7 +55,7 @@ void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name )
 
     /* Binary search for the exact failure point */
     do {
-        printf("# Trying %s(%d) max...", func_name, time);
+        printf("# Trying %s(%d) min...", func_name, time);
         date = (*date_func)(&time);
 
         time_change /= 2;
