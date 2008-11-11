@@ -32,7 +32,7 @@ my $build = Local::Module::Build->new(
         'Test::Warn'            => '0.11',
         'Test::Exception'       => '0.27',
         'Test::More'            => 0.62,
-        'ExtUtils::CBuilder'    => 0,
+        'ExtUtils::CBuilder'    => 0.24,
     },
 
     requires            => {
