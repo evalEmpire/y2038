@@ -10,6 +10,10 @@ Next
   * Fixed a number of off-by-one and overflow errors in the limit check.
   * Added debugging information to the limit check program.
 
+  Doc Improvements
+  * Added the location of the repository.
+  * Gave a more specific location to submit bugs to.
+
 
 20081106  Thu Nov  6 19:01:22 PST 2008
   Portability Improvements

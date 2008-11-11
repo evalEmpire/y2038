@@ -100,9 +100,15 @@ internally and so accuracy degrates after 2**52.
 
 =head1 BUGS & FEEDBACK
 
-See F<http://rt.cpan.org> to report and view bugs.
+See F<http://rt.cpan.org/Dist/Display.html?Queue=Time-y2038> to report
+and view bugs.
 
 If you like the module, please drop the author an email.
+
+The latest version of this module can be found at
+F<http://y2038.googlecode.com/> and the repository is at
+F<http://y2038.googlecode.com/svn/trunk/> in F<perl/Time-y2038>.  You
+have to check out the whole repository because there are symlinks.
 
 
 =head1 AUTHOR
