@@ -3,6 +3,12 @@ Next
   * Moved building the program to check the limits of time.h to the code
     step to avoid having a configure_requires on ExtUtils::CBuilder.
   * Also made it quiessent and not rebuild itself unless necessary.
+  * Added some sane min/max limits to the time.h limit check to avoid
+    going wildly out of range and tickling system bugs that cause the
+    whole thing to hang.
+  * Improved the limit check so now it's a real binary search.
+  * Fixed a number of off-by-one and overflow errors in the limit check.
+  * Added debugging information to the limit check program.
 
 
 20081106  Thu Nov  6 19:01:22 PST 2008
