@@ -26,9 +26,10 @@ sub note_time_limits {
 
     my %limits;
     for my $line (@maxes) {
-        next if $line =~ /^#/;
+        next if $line =~ /^#/;          # comment
+        next if $line !~ /\S/;          # blank line
+
         my($key, $val) = split /\s+/, $line;
-        next unless $key and $val;
         $limits{$key} = $val;
     }
 
