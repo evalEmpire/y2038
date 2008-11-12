@@ -28,7 +28,7 @@ my $build = Local::Module::Build->new(
     },
 
     build_requires      => {
-        'Module::Build'         => '0.2808',
+        'Module::Build'         => '0.2809',    # for ->cbuilder()
         'Test::Warn'            => '0.11',
         'Test::Exception'       => '0.27',
         'Test::More'            => 0.62,
