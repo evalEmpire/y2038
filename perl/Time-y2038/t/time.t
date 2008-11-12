@@ -46,9 +46,23 @@ SKIP: {
     is_deeply( [localtime(-2**52)], [44, 11, 12, 25, 0, -142713321, 1, 24, 0], 'localtime(-2**52)' );
     is_deeply( [localtime(1224479316)], [36, 8, 22, 19, 9, 108, 0, 292, 1], 'localtime() w/dst' );
 
-    is( localtime(2**52),      'Fri Dec  5 19:48:16 142715360' );
-    is( localtime(-2**52),     'Mon Jan 25 12:11:44 -142711421' );
-    is( localtime(1224479316), 'Sun Oct 19 22:08:36 2008' );
+    # This is inverted because hash keys get stringified and the
+    # big numbers may lose accuracy.
+    my %times = (
+        'Fri Dec  5 19:48:16 142715360'         => 2**52,
+        'Mon Jun 19 06:54:08 71358665'          => 2**51,
+        'Tue Sep 25 11:57:04 35680317'          => 2**50,
+        'Mon Oct 25 20:46:08 3058'              => 2**35,
+        'Fri Mar  7 12:13:52 881'               => -2**35,
+        'Thu Apr  7 22:02:56 -35676378'         => -2**50,
+        'Sat Jul 14 03:05:52 -71354726'         => -2**51,
+        'Mon Jan 25 12:11:44 -142711421'        => -2**52,
+        'Sun Oct 19 22:08:36 2008'              => 1224479316,
+    );
+    for my $want (keys %times) {
+        my $time = $times{$want};
+        is localtime($time), $want, sprintf "localtime(%.0f)", $time;
+    }
 }
 
 
