@@ -1,7 +1,13 @@
 Next
+  Build Fixes
+  * Had too old a version of Module::Build listed as the requirement.
+
   Build Improvements
   * The limit check program was ignoring a limit of 0.  Duh.
   * Fix so the check_max program is not always re-run on Cygwin.
+
+  Test Improvements
+  * More localtime() tests to track down the 64 bit issues
 
 
 20081111  Tue Nov 11 15:36:27 PST 2008
