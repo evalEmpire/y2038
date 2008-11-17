@@ -1,6 +1,7 @@
 Next
   Build Improvements
   * The limit check program was ignoring a limit of 0.  Duh.
+  * Fix so the check_max program is not always re-run on Cygwin.
 
 
 20081111  Tue Nov 11 15:36:27 PST 2008
