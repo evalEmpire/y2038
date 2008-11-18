@@ -13,9 +13,9 @@ sub note_time_limits {
         my $cb = $self->cbuilder;
         my $obj = $cb->compile(source => "check_max.c", include_dirs => ['y2038']);
         $exe = $cb->link_executable(objects => $obj, exe_file => $exe);
-	$exe = $self->find_real_exe($exe);
-	$self->notes(check_max => $exe);
-	$self->add_to_cleanup($exe);
+        $exe = $self->find_real_exe($exe);
+        $self->notes(check_max => $exe);
+        $self->add_to_cleanup($exe);
     }
 
     return if $self->up_to_date(["munge_config", $exe] => "y2038/time64_config.h");
@@ -60,11 +60,11 @@ sub find_real_exe {
 
     my $real_exe;
     for ($exe, "$exe.exe") {
-	$real_exe = $_ if -e;
+        $real_exe = $_ if -e;
     }
 
     warn "Can't find the executable, thought it was $exe"
-	unless defined $real_exe;
+        unless defined $real_exe;
 
     return $real_exe;
 }

@@ -118,8 +118,8 @@ static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
 #define CHEAT_DAYS  (1199145600 / 24 / 60 / 60)
 #define CHEAT_YEARS 108
 
-#define IS_LEAP(n)	((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
-#define WRAP(a,b,m)	((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
+#define IS_LEAP(n)      ((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
+#define WRAP(a,b,m)     ((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
 
 #ifdef USE_SYSTEM_LOCALTIME
 #    define SHOULD_USE_SYSTEM_LOCALTIME(a)  (       \
