@@ -76,6 +76,24 @@ int is_int(const int have, const int want, const char *message, ...) {
 }
 
 
+int is_str(const char* have, const char* want, const char *message, ...) {
+    int test = strcmp(have, want) == 0;
+    va_list args;
+    va_start(args, message);
+
+    do_test( test, message, args );
+
+    if( !test ) {
+        diag("have: %s", have);
+        diag("want: %s", want);
+    }
+
+    va_end(args);
+
+    return test;
+}
+
+
 int is_Int64(const Int64 have, const Int64 want, const char *name, ...) {
     int test = (have == want);
 
@@ -131,6 +149,20 @@ int tm_is(const struct TM *have, const struct TM *want, const char *name)
     pass *= is_int(have->tm_sec,  want->tm_sec,   "   sec");
 
     return pass;
+}
+
+
+struct TM make_tm( int sec, int min, int hour, int day, int mon, Year year ) {
+    struct TM date;
+
+    date.tm_year = year - 1900;
+    date.tm_mon  = mon - 1;
+    date.tm_mday  = day;
+    date.tm_hour = hour;
+    date.tm_min  = min;
+    date.tm_sec  = sec;
+
+    return date;
 }
     
 

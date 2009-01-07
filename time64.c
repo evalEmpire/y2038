@@ -51,7 +51,7 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 /* Spec says except for stftime() and the _r() functions, these
    all return static memory.  Stabbings! */
 static struct TM   Static_Return_Date;
-/* static char        Static_Return_String[1024]; */
+static char        Static_Return_String[35];
 
 static const int days_in_month[2][12] = {
     {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
@@ -61,6 +61,15 @@ static const int days_in_month[2][12] = {
 static const int julian_days_by_month[2][12] = {
     {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334},
     {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335},
+};
+
+static char wday_name[7][3] = {
+    "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+};
+
+static char mon_name[12][3] = {
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
 static const int length_of_year[2] = { 365, 366 };
@@ -699,11 +708,47 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
 }
 
 
+int valid_tm_wday( const struct TM* date ) {
+    if( 0 <= date->tm_wday && date->tm_wday <= 6 )
+        return 1;
+    else
+        return 0;
+}
+
+int valid_tm_mon( const struct TM* date ) {
+    if( 0 <= date->tm_mon && date->tm_mon <= 11 )
+        return 1;
+    else
+        return 0;
+}
+
+
+char *asctime64_r( const struct TM* date, char *result ) {
+    /* I figure everything else can be displayed, even hour 25, but if
+       these are out of range we walk off the name arrays */
+    if( !valid_tm_wday(date) || !valid_tm_mon(date) )
+        return NULL;
+
+    sprintf(result, "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n",
+        wday_name[date->tm_wday],
+        mon_name[date->tm_mon],
+        date->tm_mday, date->tm_hour,
+        date->tm_min, date->tm_sec,
+        1900 + date->tm_year);
+
+    return result;
+}
+
+
+/* Non-thread safe versions of the above */
 struct TM *localtime64(const Time64_T *time) {
     return localtime64_r(time, &Static_Return_Date);
 }
 
-
 struct TM *gmtime64(const Time64_T *time) {
     return gmtime64_r(time, &Static_Return_Date);
+}
+
+char *asctime64( const struct TM* date ) {
+    return asctime64_r( date, Static_Return_String );
 }
