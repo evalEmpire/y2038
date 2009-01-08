@@ -41,5 +41,7 @@ int main(void) {
        (Can't think of any way to make it error)
     */
 
+    done_testing();
+
     return 0;
 }

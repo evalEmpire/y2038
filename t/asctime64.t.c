@@ -60,5 +60,7 @@ int main(void) {
 
     /* No errors are defined. (ISO) */
 
+    done_testing();
+
     return 0;
 }
