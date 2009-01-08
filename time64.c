@@ -740,6 +740,14 @@ char *asctime64_r( const struct TM* date, char *result ) {
 }
 
 
+char *ctime64_r( const Time64_T* time, char* result ) {
+    struct TM date;
+
+    localtime64_r( time, &date );
+    return asctime64_r( &date, result );
+}
+
+
 /* Non-thread safe versions of the above */
 struct TM *localtime64(const Time64_T *time) {
     return localtime64_r(time, &Static_Return_Date);
@@ -751,4 +759,8 @@ struct TM *gmtime64(const Time64_T *time) {
 
 char *asctime64( const struct TM* date ) {
     return asctime64_r( date, Static_Return_String );
+}
+
+char *ctime64( const Time64_T* time ) {
+    return asctime64(localtime64(time));
 }

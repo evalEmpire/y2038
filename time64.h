@@ -50,6 +50,9 @@ struct TM *localtime64   (const Time64_T *);
 char *asctime64          (const struct TM *);
 char *asctime64_r        (const struct TM *, char *);
 
+char *ctime64            (const Time64_T*);
+char *ctime64_r          (const Time64_T*, char*);
+
 Time64_T   timegm64      (const struct TM *);
 Time64_T   mktime64      (const struct TM *);
 Time64_T   timelocal64   (const struct TM *);

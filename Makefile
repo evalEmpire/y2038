@@ -48,6 +48,9 @@ t/mktime64.t : t/tap.c t/mktime64.t.c time64.o
 t/asctime64.t : t/tap.c t/asctime64.t.c time64.o
 	$(LINK) time64.o t/asctime64.t.c -o $@
 
+t/ctime64.t : t/tap.c t/ctime64.t.c time64.o
+	$(LINK) time64.o t/ctime64.t.c -o $@
+
 t/seconds_between_years.t : t/tap.c t/seconds_between_years.t.c time64.c
 	$(LINK) t/seconds_between_years.t.c -o $@
 
