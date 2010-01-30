@@ -338,7 +338,7 @@ static int safe_year(const Year year)
 }
 
 
-void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
+void copy_tm_to_TM64(const struct tm *src, struct TM *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -370,7 +370,7 @@ void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
 }
 
 
-void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
+void copy_TM64_to_tm(const struct TM *src, struct tm *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -468,14 +468,14 @@ Time64_T mktime64(const struct TM *input_date) {
     Year      year = input_date->tm_year + 1900;
 
     if( MIN_SAFE_YEAR <= year && year <= MAX_SAFE_YEAR ) {
-        copy_TM_to_tm(input_date, &safe_date);
+        copy_TM64_to_tm(input_date, &safe_date);
         return (Time64_T)mktime(&safe_date);
     }
 
     /* Have to make the year safe in date else it won't fit in safe_date */
     date = *input_date;
     date.tm_year = safe_year(year) - 1900;
-    copy_TM_to_tm(&date, &safe_date);
+    copy_TM64_to_tm(&date, &safe_date);
 
     time = (Time64_T)mktime(&safe_date);
 
@@ -509,7 +509,7 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
         struct tm safe_date;
         GMTIME_R(&safe_time, &safe_date);
 
-        copy_tm_to_TM(&safe_date, p);
+        copy_tm_to_TM64(&safe_date, p);
         assert(check_tm(p));
 
         return p;
@@ -636,7 +636,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
 
         LOCALTIME_R(&safe_time, &safe_date);
 
-        copy_tm_to_TM(&safe_date, local_tm);
+        copy_tm_to_TM64(&safe_date, local_tm);
         assert(check_tm(local_tm));
 
         return local_tm;
@@ -663,7 +663,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
         return NULL;
     }
 
-    copy_tm_to_TM(&safe_date, local_tm);
+    copy_tm_to_TM64(&safe_date, local_tm);
 
     local_tm->tm_year = orig_year;
     if( local_tm->tm_year != orig_year ) {
