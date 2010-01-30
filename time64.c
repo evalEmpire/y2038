@@ -150,22 +150,22 @@ static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
 
 /* Multi varadic macros are a C99 thing, alas */
 #ifdef TIME_64_DEBUG
-#    define TRACE(format) (fprintf(stderr, format))
-#    define TRACE1(format, var1)    (fprintf(stderr, format, var1))
-#    define TRACE2(format, var1, var2)    (fprintf(stderr, format, var1, var2))
-#    define TRACE3(format, var1, var2, var3)    (fprintf(stderr, format, var1, var2, var3))
+#    define TIME64_TRACE(format) (fprintf(stderr, format))
+#    define TIME64_TRACE1(format, var1)    (fprintf(stderr, format, var1))
+#    define TIME64_TRACE2(format, var1, var2)    (fprintf(stderr, format, var1, var2))
+#    define TIME64_TRACE3(format, var1, var2, var3)    (fprintf(stderr, format, var1, var2, var3))
 #else
-#    define TRACE(format) ((void)0)
-#    define TRACE1(format, var1) ((void)0)
-#    define TRACE2(format, var1, var2) ((void)0)
-#    define TRACE3(format, var1, var2, var3) ((void)0)
+#    define TIME64_TRACE(format) ((void)0)
+#    define TIME64_TRACE1(format, var1) ((void)0)
+#    define TIME64_TRACE2(format, var1, var2) ((void)0)
+#    define TIME64_TRACE3(format, var1, var2, var3) ((void)0)
 #endif
 
 
 static int is_exception_century(Year year)
 {
     int is_exception = ((year % 100 == 0) && !(year % 400 == 0));
-    TRACE1("# is_exception_century: %s\n", is_exception ? "yes" : "no");
+    TIME64_TRACE1("# is_exception_century: %s\n", is_exception ? "yes" : "no");
 
     return(is_exception);
 }
@@ -192,7 +192,7 @@ Time64_T timegm64(const struct TM *date) {
         orig_year -= cycles * 400;
         days      += (Time64_T)cycles * days_in_gregorian_cycle;
     }
-    TRACE3("# timegm/ cycles: %d, days: %lld, orig_year: %lld\n", cycles, days, orig_year);
+    TIME64_TRACE3("# timegm/ cycles: %d, days: %lld, orig_year: %lld\n", cycles, days, orig_year);
 
     if( orig_year > 70 ) {
         year = 70;
@@ -270,7 +270,7 @@ static Year cycle_offset(Year year)
     exceptions  = year_diff / 100;
     exceptions -= year_diff / 400;
 
-    TRACE3("# year: %lld, exceptions: %lld, year_diff: %lld\n",
+    TIME64_TRACE3("# year: %lld, exceptions: %lld, year_diff: %lld\n",
           year, exceptions, year_diff);
 
     return exceptions * 16;
@@ -329,7 +329,7 @@ static int safe_year(const Year year)
     else
         assert(0);
 
-    TRACE3("# year: %lld, year_cycle: %lld, safe_year: %d\n",
+    TIME64_TRACE3("# year: %lld, year_cycle: %lld, safe_year: %d\n",
           year, year_cycle, safe_year);
 
     assert(safe_year <= MAX_SAFE_YEAR && safe_year >= MIN_SAFE_YEAR);
@@ -632,7 +632,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
     if( SHOULD_USE_SYSTEM_LOCALTIME(*time) ) {
         safe_time = (time_t)*time;
 
-        TRACE1("Using system localtime for %lld\n", *time);
+        TIME64_TRACE1("Using system localtime for %lld\n", *time);
 
         LOCALTIME_R(&safe_time, &safe_date);
 
@@ -643,7 +643,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
     }
 
     if( gmtime64_r(time, &gm_tm) == NULL ) {
-        TRACE1("gmtime64_r returned null for %lld\n", *time);
+        TIME64_TRACE1("gmtime64_r returned null for %lld\n", *time);
         return NULL;
     }
 
@@ -653,13 +653,13 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
         gm_tm.tm_year < (1970 - 1900)
        )
     {
-        TRACE1("Mapping tm_year %lld to safe_year\n", (Year)gm_tm.tm_year);
+        TIME64_TRACE1("Mapping tm_year %lld to safe_year\n", (Year)gm_tm.tm_year);
         gm_tm.tm_year = safe_year((Year)(gm_tm.tm_year + 1900)) - 1900;
     }
 
     safe_time = (time_t)timegm64(&gm_tm);
     if( LOCALTIME_R(&safe_time, &safe_date) == NULL ) {
-        TRACE1("localtime_r(%d) returned NULL\n", (int)safe_time);
+        TIME64_TRACE1("localtime_r(%d) returned NULL\n", (int)safe_time);
         return NULL;
     }
 
@@ -667,7 +667,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
 
     local_tm->tm_year = orig_year;
     if( local_tm->tm_year != orig_year ) {
-        TRACE2("tm_year overflow: tm_year %lld, orig_year %lld\n",
+        TIME64_TRACE2("tm_year overflow: tm_year %lld, orig_year %lld\n",
               (Year)local_tm->tm_year, (Year)orig_year);
 
 #ifdef EOVERFLOW
