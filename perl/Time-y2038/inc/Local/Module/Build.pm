@@ -18,7 +18,8 @@ sub note_time_limits {
         $self->add_to_cleanup($exe);
     }
 
-    return if $self->up_to_date(["munge_config", $exe] => "y2038/time64_config.h");
+    return if $self->up_to_date(["y2038/time64_config.h.in", "munge_config", $exe]
+                                => "y2038/time64_config.h");
     warn "  and running it...\n";
 
     my @maxes = `./$exe`;
