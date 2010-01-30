@@ -7,9 +7,22 @@ It makes use of the system's native 32 bit functions to perform time
 zone and daylight savings time calculations and thus does *not* need
 to ship its own time zone table.
 
-time64.h currently implements three public functions, localtime64_r(),
-gmtime64_r() and timegm64().  They are implementations of
-localtime_r(), gmtime_r() and timegm64().
+Here is a list of the currently implemented functions in time64.h and
+their POSIX time.h equivalents.
+
+  time64.h                      time.h
+  --------                      ------
+  localtime64_r                 localtime_r
+  localtime64                   localtime
+  gmtime64_r                    gmtime_r
+  gmtime64                      gmtime
+  asctime64_r                   asctime_r
+  asctime64                     asctime
+  ctime64_r                     ctime_r
+  ctime64                       ctime
+  timelocal64                   mktime
+  mktime64                      mktime
+  timegm64                      timegm (a GNU extension)
 
 To install, simply copy time64.c and time64.h into your project and
 make use of the functions.
@@ -24,19 +37,21 @@ different time zones.
 Limitations, Issues, etc...
 ---------------------------
 
-localtime64_r() gets its time zone and daylight savings time information by
-mappping the future year back to a similar one between 2010 and 2037, safe
-for localtime_r().  The calculations are accurate according to current time
-zone and daylight savings information, but may become inaccurate if a
-change is made that takes place after 2010.
+localtime64_r() gets its time zone and daylight savings time
+information by mappping the future year back to a similar one between
+2010 and 2037, safe for localtime_r().  The calculations are accurate
+according to current time zone and daylight savings information, but
+may become inaccurate if a change is made that takes place after 2010.
+But its better to be off by an hour than 137 years.
 
 Future versions will probe for a 64 bit safe system localtime_r() and
-gmtime_r() and use that.
+gmtime_r() and use that.  You can manually set the safe range of your
+system in time64_config.h.
 
 The maximum date is still limited by your tm struct.  Most 32 bit
 systems use a signed integer tm_year which means the practical upper
 limit is the year 2147483647 which is somewhere around 2**54.  You can
-use a 64 bit clean tm struct by setting USE_TM64 in time64.h
+use a 64 bit clean tm struct by setting USE_TM64 in time64_config.h
 
 
 Portability

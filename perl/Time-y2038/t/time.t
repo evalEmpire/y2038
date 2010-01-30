@@ -66,6 +66,31 @@ SKIP: {
 }
 
 
+# Some sanity tests for the far, far future and far, far past
+{
+    my %time2year = (
+        -2**62  => -146138510344,
+        -2**52  => -142711421,
+        -2**48  => -8917617,
+        -2**46  => -2227927,
+         2**46  => 2231866,
+         2**48  => 8921556,
+         2**52  => 142715360,
+         2**62  => 146138514283
+    );
+
+    for my $time (sort keys %time2year) {
+        my $want = $time2year{$time};
+
+        my $have = (gmtime($time))[5] + 1900;
+        is $have, $want, "year check, gmtime($time)";
+
+        $have = (localtime($time))[5] + 1900;
+        is $have, $want, "year check, localtime($time)";
+    }
+}
+
+
 for my $name (qw(gmtime localtime)) {
     my $func = do {
         no strict 'refs';

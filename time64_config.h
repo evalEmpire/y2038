@@ -27,7 +27,11 @@
    with tm.  Conversion functions will be provided.
 */
 /* #define USE_TM64 */
-
+#ifdef USE_TM64
+    #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %lld\n"
+#else
+    #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n"
+#endif
 
 /* HAVE_STDINT */
 #define HAVE_STDINT

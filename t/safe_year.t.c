@@ -34,7 +34,7 @@ static void year_to_tm(const Year year, struct tm *ret) {
 
     time = timegm64(&date);
     gmtime64_r(&time, &date);
-    copy_TM_to_tm(&date, ret);
+    copy_TM64_to_tm(&date, ret);
 }
 
 
