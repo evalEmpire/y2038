@@ -38,6 +38,8 @@ my $build = Local::Module::Build->new(
     requires            => {
         perl                    => '5.6.1'
     },
+
+    add_to_cleanup      => [qw(check_max.o check_max)],
 );
 
 $build->create_build_script;
