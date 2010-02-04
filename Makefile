@@ -8,7 +8,10 @@ CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 COMPILE  = $(CC) $(CFLAGS)
 LINK     = $(COMPILE)
 
-all : time64.o
+all : time64.o bin/check_max
+
+bin/check_max : time64.o time64_config.h bin/check_max.c
+	$(LINK) time64.o bin/check_max.c -o $@
 
 time64.o : time64_config.h time64.h time64.c Makefile
 
