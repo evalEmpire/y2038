@@ -60,7 +60,7 @@ void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name )
 
         time_change /= 2;
 
-        /* gmtime() broke or tm_year overflowed or time_t overflowed */
+        /* date_func() broke or tm_year overflowed or time_t overflowed */
         if(date == NULL || date->tm_year > 70 || time > good_time) {
             printf(" failed\n");
             time -= time_change;
