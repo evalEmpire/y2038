@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <math.h>
+#include "time64_config.h"
 
 struct tm Test_TM;
 
@@ -18,7 +19,7 @@ double my_difftime(time_t left, time_t right) {
     return diff;
 }
 
-void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name ) {
+time_t check_date_max( struct tm * (*date_func)(const time_t *), char *func_name ) {
     struct tm *date;
     time_t time        = Time_Max;
     time_t good_time   = 0;
@@ -44,10 +45,11 @@ void check_date_max( struct tm * (*date_func)(const time_t *), char *func_name )
     } while(time_change > 0 && good_time < Time_Max);
 
     printf("%s_max %.0f\n", func_name, my_difftime(good_time, Time_Zero));
+    return(good_time);
 }
 
 
-void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name ) {
+time_t check_date_min( struct tm * (*date_func)(const time_t *), char *func_name ) {
     struct tm *date;
     time_t time        = Time_Min;
     time_t good_time   = 0;
@@ -73,6 +75,75 @@ void check_date_min( struct tm * (*date_func)(const time_t *), char *func_name )
     } while((time_change > 0) && (good_time > Time_Min));
 
     printf("%s_min %.0f\n", func_name, my_difftime(good_time, Time_Zero));
+    return(good_time);
+}
+
+
+time_t check_to_time_max( time_t (*to_time)(struct tm *), char *func_name,
+                          struct tm * (*to_date)(const time_t *) )
+{
+    struct tm *date;
+    time_t round_trip;
+    time_t time        = Time_Max;
+    time_t good_time   = 0;
+    time_t time_change = Time_Max;
+
+    /* Binary search for the exact failure point */
+    do {
+        printf("# Trying %s(%.0f) max...", func_name, my_difftime(time, Time_Zero));
+        date = (*to_date)(&time);
+        round_trip = (*to_time)(date);
+
+        time_change /= 2;
+
+        /* date_func() broke or tm_year overflowed or time_t overflowed */
+        if(time != round_trip) {
+            printf(" failed\n");
+            time -= time_change;
+        }
+        else {
+            printf(" success\n");
+            good_time = time;
+            time += time_change;
+        }
+    } while(time_change > 0 && good_time < Time_Max);
+
+    printf("%s_max %.0f\n", func_name, my_difftime(good_time, Time_Zero));
+    return(good_time);
+}
+
+
+time_t check_to_time_min( time_t (*to_time)(struct tm *), char *func_name,
+                          struct tm * (*to_date)(const time_t *) )
+{
+    struct tm *date;
+    time_t round_trip;
+    time_t time        = Time_Min;
+    time_t good_time   = 0;
+    time_t time_change = Time_Min;
+
+    /* Binary search for the exact failure point */
+    do {
+        printf("# Trying %s(%.0f) min...", func_name, my_difftime(time, Time_Zero));
+        date = (*to_date)(&time);
+        round_trip = (*to_time)(date);
+
+        time_change /= 2;
+
+        /* date_func() broke or tm_year overflowed or time_t overflowed */
+        if(time != round_trip) {
+            printf(" failed\n");
+            time -= time_change;
+        }
+        else {
+            printf(" success\n");
+            good_time = time;
+            time += time_change;
+        }
+    } while((time_change > 0) && (good_time > Time_Min));
+
+    printf("%s_min %.0f\n", func_name, my_difftime(good_time, Time_Zero));
+    return(good_time);
 }
 
 
@@ -102,11 +173,30 @@ void guess_time_limits_from_types(void) {
 }
 
 int main(void) {
+    time_t gmtime_max;
+    time_t gmtime_min;
+    time_t localtime_max;
+    time_t localtime_min;
+
     guess_time_limits_from_types();
-    check_date_max(gmtime, "gmtime");
-    check_date_max(localtime, "localtime");
-    check_date_min(gmtime, "gmtime");
-    check_date_min(localtime, "localtime");
+
+    gmtime_max = check_date_max(gmtime, "gmtime");
+    gmtime_min = check_date_min(gmtime, "gmtime");
+
+    localtime_max = check_date_max(localtime, "localtime");
+    localtime_min = check_date_min(localtime, "localtime");
+
+#ifdef HAS_TIMEGM
+    Time_Max = gmtime_max;
+    Time_Min = gmtime_min;
+    check_to_time_max(timegm, "timegm", gmtime);
+    check_to_time_min(timegm, "timegm", gmtime);
+#endif
+
+    Time_Max = localtime_max;
+    Time_Min = localtime_min;
+    check_to_time_max(mktime, "mktime", localtime);
+    check_to_time_min(mktime, "mktime", localtime);
 
     return 0;
 }
