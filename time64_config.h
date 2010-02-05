@@ -27,6 +27,7 @@
    with tm.  Conversion functions will be provided.
 */
 /* #define USE_TM64 */
+
 #ifdef USE_TM64
     #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %lld\n"
 #else
@@ -46,7 +47,7 @@
 */
 #define HAS_GMTIME_R
 #define HAS_LOCALTIME_R
-/*#define HAS_TIMEGM */
+/* #define HAS_TIMEGM */
 
 
 /* Details of non-standard tm struct elements.
@@ -71,19 +72,32 @@
 */
 #define USE_SYSTEM_LOCALTIME
 /* #define USE_SYSTEM_GMTIME */
+#define USE_SYSTEM_MKTIME
+/* #define USE_SYSTEM_TIMEGM */
 
 
 /* SYSTEM_LOCALTIME_MAX
    SYSTEM_LOCALTIME_MIN
    SYSTEM_GMTIME_MAX
    SYSTEM_GMTIME_MIN
-   Maximum and minimum values your system's gmtime() and localtime()
-   can handle.  We will use your system functions if the time falls
-   inside these ranges.
+   SYSTEM_MKTIME_MAX
+   SYSTEM_MKTIME_MIN
+   SYSTEM_TIMEGM_MAX
+   SYSTEM_TIMEGM_MIN
+   Maximum and minimum inputs your system's respective time functions
+   can correctly handle.  time64.h will use your system functions if
+   the input falls inside these ranges and corresponding USE_SYSTEM_*
+   constant is defined.
 */
 #define SYSTEM_LOCALTIME_MAX     2147483647
-#define SYSTEM_LOCALTIME_MIN    -2147483647
+#define SYSTEM_LOCALTIME_MIN    -2147483648
 #define SYSTEM_GMTIME_MAX        2147483647
-#define SYSTEM_GMTIME_MIN       -2147483647
+#define SYSTEM_GMTIME_MIN       -2147483648
+#define SYSTEM_MKTIME_MAX        2147483647 
+#define SYSTEM_MKTIME_MIN       -2147483648
+#ifdef HAS_TIMEGM
+    #define SYSTEM_TIMEGM_MAX    2147483647
+    #define SYSETM_TIMEGM_MIN   -2147483648
+#endif
 
 #endif /* TIME64_CONFIG_H */

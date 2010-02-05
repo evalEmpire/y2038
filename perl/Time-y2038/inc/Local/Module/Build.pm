@@ -23,6 +23,7 @@ sub note_time_limits {
     warn "  and running it...\n";
 
     my @maxes = `./$exe`;
+    chomp @maxes;
 
     warn "  Done.\n";
 
@@ -31,22 +32,27 @@ sub note_time_limits {
         next if $line =~ /^#/;          # comment
         next if $line !~ /\S/;          # blank line
 
-        my($key, $val) = split /\s+/, $line;
-        $limits{$key} = $val;
+        my($key, $time, $date) = split /\s+/, $line, 3;
+        $limits{$key} = { time => $time, date => $date };
     }
 
     # Windows lies about being able to handle just a little bit of
     # negative time.
     for my $key (qw(gmtime_min localtime_min)) {
-        if( -10_000 < $limits{$key} && $limits{$key} < 0 ) {
-            $limits{$key} = 0;
+        if( -10_000 < $limits{$key}{time} && $limits{$key}{time} < 0 ) {
+            $limits{$key}{time} = 0;
         }
     }
 
+    $limits{timegm_max} ||= { time => 0, date => "{}" };
+    $limits{timegm_min} ||= { time => 0, date => "{}" };
+
     for my $key (sort { $a cmp $b } keys %limits) {
-        my $val = $limits{$key};
-        warn sprintf "%15s:  %d\n", $key, $val;
-        $self->notes($key, $limits{$key});
+        my $time = $limits{$key}{time};
+        my $date = $limits{$key}{date};
+        my $val = defined $date ? $date : $time;
+        warn sprintf "%15s:  %s\n", $key, $val;
+        $self->notes($key, $val);
     }
 
     return;

@@ -22,9 +22,9 @@ print $output_fh <<"END";
 END
 
 while(<$input_fh>) {
-    my $matched = s{%%(.*)%%}{$config{$1}}g;
+    my $matched = s{%%(.*)%%}{$config{$1} || ''}eg;
 
-    if( $matched and !defined $config{$1} and !length $config{$1} ) {
+    if( $matched and (!defined $config{$1} or !length $config{$1}) ) {
         warn "Your configuration is missing \$config{$1}.\n".
              "Please edit $output_file by hand to fix.\n"
     }

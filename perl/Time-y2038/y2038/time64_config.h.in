@@ -27,6 +27,7 @@
    with tm.  Conversion functions will be provided.
 */
 #define USE_TM64
+
 #ifdef USE_TM64
     #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %lld\n"
 #else
@@ -64,25 +65,39 @@
 
 /* USE_SYSTEM_LOCALTIME
    USE_SYSTEM_GMTIME
+   USE_SYSTEM_MKTIME
+   USE_SYSTEM_TIMEGM
    Should we use the system functions if the time is inside their range?
    Your system localtime() is probably more accurate, but our gmtime() is
    fast and safe.
 */
 #define USE_SYSTEM_LOCALTIME
 /* #define USE_SYSTEM_GMTIME */
-
+#define USE_SYSTEM_MKTIME
+/* #define USE_SYSTEM_TIMEGM */
 
 /* SYSTEM_LOCALTIME_MAX
    SYSTEM_LOCALTIME_MIN
    SYSTEM_GMTIME_MAX
    SYSTEM_GMTIME_MIN
-   Maximum and minimum values your system's gmtime() and localtime()
-   can handle.  We will use your system functions if the time falls
-   inside these ranges.
+   SYSTEM_MKTIME_MAX
+   SYSTEM_MKTIME_MIN
+   SYSTEM_TIMEGM_MAX
+   SYSTEM_TIMEGM_MIN
+   Maximum and minimum inputs your system's respective time functions
+   can correctly handle.  time64.h will use your system functions if
+   the input falls inside these ranges and corresponding USE_SYSTEM_*
+   constant is defined.
 */
 #define SYSTEM_LOCALTIME_MAX     %%localtime_max%%
 #define SYSTEM_LOCALTIME_MIN     %%localtime_min%%
 #define SYSTEM_GMTIME_MAX        %%gmtime_max%%
 #define SYSTEM_GMTIME_MIN        %%gmtime_min%%
+#define SYSTEM_MKTIME_MAX        %%mktime_max%%
+#define SYSTEM_MKTIME_MIN        %%mktime_min%%
+#ifdef HAS_TIMEGM
+    #define SYSTEM_TIMEGM_MAX        %%timegm_max%%
+    #define SYSETM_TIMEGM_MIN        %%timegm_min%%
+#endif
 
 #endif /* TIME64_CONFIG_H */

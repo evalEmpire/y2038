@@ -3,7 +3,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <math.h>
-#include "time64_config.h"
+#include <stdlib.h>
 
 struct tm Test_TM;
 
@@ -11,6 +11,18 @@ time_t Time_Max;
 time_t Time_Min;
 
 time_t Time_Zero = 0;
+
+
+char *dump_date(const struct tm *date) {
+    char *dump = malloc(80 * sizeof(char));
+    sprintf(
+        dump,
+        "{ %d, %d, %d, %d, %d, %d }",
+        date->tm_sec, date->tm_min, date->tm_hour, date->tm_mday, date->tm_mon, date->tm_year
+    );
+
+    return dump;
+}
 
 
 /* Visual C++ 2008's difftime() can't do negative times */
@@ -82,10 +94,11 @@ time_t check_date_min( struct tm * (*date_func)(const time_t *), char *func_name
 time_t check_to_time_max( time_t (*to_time)(struct tm *), char *func_name,
                           struct tm * (*to_date)(const time_t *) )
 {
-    struct tm *date;
     time_t round_trip;
     time_t time        = Time_Max;
     time_t good_time   = 0;
+    struct tm *date;
+    struct tm *good_date;
     time_t time_change = Time_Max;
 
     /* Binary search for the exact failure point */
@@ -104,11 +117,12 @@ time_t check_to_time_max( time_t (*to_time)(struct tm *), char *func_name,
         else {
             printf(" success\n");
             good_time = time;
+            good_date = date;
             time += time_change;
         }
     } while(time_change > 0 && good_time < Time_Max);
 
-    printf("%s_max %.0f\n", func_name, my_difftime(good_time, Time_Zero));
+    printf("%s_max %.0f %s\n", func_name, my_difftime(good_time, Time_Zero), dump_date(good_date));
     return(good_time);
 }
 
@@ -116,10 +130,11 @@ time_t check_to_time_max( time_t (*to_time)(struct tm *), char *func_name,
 time_t check_to_time_min( time_t (*to_time)(struct tm *), char *func_name,
                           struct tm * (*to_date)(const time_t *) )
 {
-    struct tm *date;
     time_t round_trip;
     time_t time        = Time_Min;
     time_t good_time   = 0;
+    struct tm *date;
+    struct tm *good_date;
     time_t time_change = Time_Min;
 
     /* Binary search for the exact failure point */
@@ -138,11 +153,12 @@ time_t check_to_time_min( time_t (*to_time)(struct tm *), char *func_name,
         else {
             printf(" success\n");
             good_time = time;
+            good_date = date;
             time += time_change;
         }
     } while((time_change > 0) && (good_time > Time_Min));
 
-    printf("%s_min %.0f\n", func_name, my_difftime(good_time, Time_Zero));
+    printf("%s_min %.0f %s\n", func_name, my_difftime(good_time, Time_Zero), dump_date(good_date));
     return(good_time);
 }
 
@@ -171,6 +187,7 @@ void guess_time_limits_from_types(void) {
         printf("Weird sizeof(time_t): %ld\n", sizeof(time_t));
     }
 }
+
 
 int main(void) {
     time_t gmtime_max;
