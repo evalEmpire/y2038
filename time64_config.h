@@ -96,11 +96,11 @@
 #define SYSTEM_LOCALTIME_MIN    -2147483648
 #define SYSTEM_GMTIME_MAX        2147483647
 #define SYSTEM_GMTIME_MIN       -2147483648
-#define SYSTEM_MKTIME_MAX        2147483647 
-#define SYSTEM_MKTIME_MIN       -2147483648
+#define SYSTEM_MKTIME_MAX        { 7, 14, 19, 18, 0, 138 }
+#define SYSTEM_MKTIME_MIN        { 52, 45, 12, 13, 11, 1 }
 #ifdef HAS_TIMEGM
-    #define SYSTEM_TIMEGM_MAX    2147483647
-    #define SYSETM_TIMEGM_MIN   -2147483648
+    #define SYSTEM_TIMEGM_MAX    { 7, 14, 19, 18, 0, 138 }
+    #define SYSETM_TIMEGM_MIN    { 52, 45, 12, 13, 11, 1 }
 #endif
 
 #endif /* TIME64_CONFIG_H */
