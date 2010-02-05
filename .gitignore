@@ -24,3 +24,5 @@ t/safe_year.t
 t/safe_year.t.dSYM/
 t/timegm.t
 t/year_limit.t
+bin/check_max
+
