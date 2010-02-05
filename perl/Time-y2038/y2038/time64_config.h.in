@@ -46,7 +46,9 @@
    HAS_TIMEGM
    Define if your system has timegm(), a GNU extension.
 */
-/* Handled by config */
+#define HAS_GMTIME_R
+#define HAS_LOCALTIME_R
+/* #define HAS_TIMEGM */
 
 
 /* Details of non-standard tm struct elements.
@@ -75,6 +77,7 @@
 /* #define USE_SYSTEM_GMTIME */
 #define USE_SYSTEM_MKTIME
 /* #define USE_SYSTEM_TIMEGM */
+
 
 /* SYSTEM_LOCALTIME_MAX
    SYSTEM_LOCALTIME_MIN

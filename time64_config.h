@@ -34,6 +34,7 @@
     #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n"
 #endif
 
+
 /* Availability of system functions.
 
    HAS_GMTIME_R
@@ -66,6 +67,8 @@
 
 /* USE_SYSTEM_LOCALTIME
    USE_SYSTEM_GMTIME
+   USE_SYSTEM_MKTIME
+   USE_SYSTEM_TIMEGM
    Should we use the system functions if the time is inside their range?
    Your system localtime() is probably more accurate, but our gmtime() is
    fast and safe.
