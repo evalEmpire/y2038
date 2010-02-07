@@ -2,9 +2,8 @@
    to make the localtime trick work
 */
 
-#include "t/tap.c"
 #include "time64.c"
-
+#include "t/tap.h"
 
 static void year_to_TM(const Year year, struct TM *date) {
     Time64_T time;

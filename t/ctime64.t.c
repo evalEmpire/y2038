@@ -1,5 +1,5 @@
 #include "time64.h"
-#include "t/tap.c"
+#include "t/tap.h"
 
 int main(void) {
     Time64_T time = 12345678987654321LL;

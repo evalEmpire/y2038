@@ -1,62 +1,40 @@
-.PHONY : test
+.PHONY : test bench clean tap_tests localtime_tests
 
 OPTIMIZE = -g
-INCLUDE  = -I.
-CC       = gcc
 WARNINGS = -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion
+INCLUDE  = -I.
 CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
-COMPILE  = $(CC) $(CFLAGS)
-LINK     = $(COMPILE)
 TIME64_OBJECTS = time64.o
 
-all : $(TIME64_OBJECTS) bin/check_max
+all : bin/check_max
 
-bin/check_max : $(TIME64_OBJECTS) time64_config.h bin/check_max.c
-	$(LINK) $(TIME64_OBJECTS) bin/check_max.c -o $@
+bin/check_max : $(TIME64_OBJECTS) time64_config.h
 
-time64.o : time64_config.h time64.h time64.c Makefile
+time64.o : time64_config.h time64.h Makefile
 
-t/bench : t/bench.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/bench.c -o $@
-
-bench : t/bench
+bench : t/bench t/bench_system
+	time t/bench_system
 	time t/bench
 
-t/localtime_test : t/localtime_test.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/localtime_test.c -o $@
+t/bench t/bench_system : $(TIME64_OBJECTS)
 
-t/gmtime_test : t/gmtime_test.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/gmtime_test.c -o $@
+t/localtime_test : $(TIME64_OBJECTS)
+t/gmtime_test : $(TIME64_OBJECTS)
 
-t/year_limit.t : t/tap.c t/year_limit.t.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/year_limit.t.c -o $@
+BLACKBOX_TESTS = 	t/year_limit.t	\
+			t/negative.t 	\
+			t/overflow.t 	\
+			t/timegm.t 	\
+			t/gmtime64.t	\
+			t/mktime64.t	\
+			t/asctime64.t	\
+			t/ctime64.t
 
-t/negative.t : t/tap.c t/negative.t.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/negative.t.c -o $@
+GLASSBOX_TESTS = 	t/safe_year.t	\
+			t/seconds_between_years.t
 
-t/overflow.t : t/tap.c t/overflow.t.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/overflow.t.c -o $@
-
-t/timegm.t : t/tap.c t/timegm.t.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/timegm.t.c -o $@
-
-t/safe_year.t : t/tap.c t/safe_year.t.c time64.c
-	$(LINK) t/safe_year.t.c -o $@
-
-t/gmtime64.t : t/tap.c t/gmtime64.t.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/gmtime64.t.c -o $@
-
-t/mktime64.t : t/tap.c t/mktime64.t.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/mktime64.t.c -o $@
-
-t/asctime64.t : t/tap.c t/asctime64.t.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/asctime64.t.c -o $@
-
-t/ctime64.t : t/tap.c t/ctime64.t.c $(TIME64_OBJECTS)
-	$(LINK) $(TIME64_OBJECTS) t/ctime64.t.c -o $@
-
-t/seconds_between_years.t : t/tap.c t/seconds_between_years.t.c time64.c
-	$(LINK) t/seconds_between_years.t.c -o $@
+$(BLACKBOX_TESTS) : t/tap.c t/tap.h $(TIME64_OBJECTS)
+$(GLASSBOX_TESTS) : t/tap.c t/tap.h
 
 test : tap_tests localtime_tests
 
@@ -71,7 +49,7 @@ localtime_tests: t/localtime_test t/gmtime_test
 	TZ=Australia/West t/localtime_test | bzip2 -9 > t/oz_test.out.bz2
 	bzdiff -u t/oz_test.out.bz2 t/oztime.out.bz2 | less -F
 
-tap_tests: t/year_limit.t t/negative.t t/overflow.t t/timegm.t t/mktime64.t t/safe_year.t t/gmtime64.t t/asctime64.t t/ctime64.t
+tap_tests: $(BLACKBOX_TESTS) $(GLASSBOX_TESTS)
 	@which prove > /dev/null || (echo 'You need prove (from the Test::Harness perl module) to run these tests'; exit 1)
 	@prove --exec '' t/*.t
 
@@ -81,5 +59,9 @@ clean:
 		t/gmtime_test		\
 		t/*_test.out.bz2	\
 		t/bench			\
+		t/bench_system		\
 		*.o
+	-rm -rf	t/*.dSYM/		\
+		bin/*.dSYM/		\
+		*.dSYM/
 

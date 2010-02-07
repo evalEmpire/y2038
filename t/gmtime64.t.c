@@ -1,5 +1,6 @@
 #include "time64.h"
-#include "t/tap.c"
+#include "t/tap.h"
+#include <stdio.h>
 
 /* Test that the non-reentrant functions share the same memory */
 void test_non_reentrant(void) {

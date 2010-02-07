@@ -1,5 +1,5 @@
 #include "time64.h"
-#include "t/tap.c"
+#include "t/tap.h"
 
 int main(void) {
     struct TM date;

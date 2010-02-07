@@ -1,6 +1,6 @@
 #include "time64.h"
 #include <stdio.h>
-#include "t/tap.c"
+#include "t/tap.h"
 
 int main(void)
 {

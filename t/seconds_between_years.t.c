@@ -1,5 +1,5 @@
 #include "time64.c"
-#include "t/tap.c"
+#include "t/tap.h"
 
 #define SECS_PER_DAY     (60LL * 60LL * 24LL)
 #define SECS_PER_YEAR    (SECS_PER_DAY * 365LL)

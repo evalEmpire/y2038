@@ -1,6 +1,6 @@
 #include <errno.h>
 #include "time64.h"
-#include "t/tap.c"
+#include "t/tap.h"
 
 int main(void) {
     Time64_T time = 0x0FFFFFFFFFFFFFFFLL;

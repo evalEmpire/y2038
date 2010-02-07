@@ -12,6 +12,8 @@ nytprof*
 .DS_Store
 MYMETA.yml
 *.o
+t/bench
+t/bench_system
 t/*.out.bz2
 t/gmtime_test
 t/localtime_test
