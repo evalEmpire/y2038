@@ -18,6 +18,7 @@ t/localtime_test
 t/asctime64.t
 t/ctime64.t
 t/gmtime64.t
+t/mktime64.t
 t/negative.t
 t/overflow.t
 t/safe_year.t
