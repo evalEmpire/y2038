@@ -1,7 +1,7 @@
 .PHONY : test bench clean tap_tests localtime_tests
 
 OPTIMIZE = -g
-WARNINGS = -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion
+WARNINGS = -W -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion -Wcast-qual -Wwrite-strings
 INCLUDE  = -I.
 CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 TIME64_OBJECTS = time64.o

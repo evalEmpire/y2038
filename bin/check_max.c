@@ -31,7 +31,7 @@ double my_difftime(time_t left, time_t right) {
     return diff;
 }
 
-time_t check_date_max( struct tm * (*date_func)(const time_t *), char *func_name ) {
+time_t check_date_max( struct tm * (*date_func)(const time_t *), const char *func_name ) {
     struct tm *date;
     time_t time        = Time_Max;
     time_t good_time   = 0;
@@ -61,7 +61,7 @@ time_t check_date_max( struct tm * (*date_func)(const time_t *), char *func_name
 }
 
 
-time_t check_date_min( struct tm * (*date_func)(const time_t *), char *func_name ) {
+time_t check_date_min( struct tm * (*date_func)(const time_t *), const char *func_name ) {
     struct tm *date;
     time_t time        = Time_Min;
     time_t good_time   = 0;
@@ -91,7 +91,7 @@ time_t check_date_min( struct tm * (*date_func)(const time_t *), char *func_name
 }
 
 
-time_t check_to_time_max( time_t (*to_time)(struct tm *), char *func_name,
+time_t check_to_time_max( time_t (*to_time)(struct tm *), const char *func_name,
                           struct tm * (*to_date)(const time_t *) )
 {
     time_t round_trip;
@@ -127,7 +127,7 @@ time_t check_to_time_max( time_t (*to_time)(struct tm *), char *func_name,
 }
 
 
-time_t check_to_time_min( time_t (*to_time)(struct tm *), char *func_name,
+time_t check_to_time_min( time_t (*to_time)(struct tm *), const char *func_name,
                           struct tm * (*to_date)(const time_t *) )
 {
     time_t round_trip;
@@ -167,7 +167,8 @@ void guess_time_limits_from_types(void) {
     if( sizeof(time_t) == 4 ) {
         /* y2038 bug, out to 2**31-1 */
         Time_Max =  2147483647;
-        Time_Min = -2147483648;
+        Time_Min = -2147483647 - 1;     /* "C90 doesn't have negative constants, only
+                                           positive ones that have been negated." */
     }
     else if( sizeof(time_t) >= 8 ) {
         /* The compiler might warn about overflowing in the assignments

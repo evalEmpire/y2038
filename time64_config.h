@@ -1,11 +1,12 @@
-#ifndef TIME64_CONFIG_H
-#    define TIME64_CONFIG_H
-
 /* Configuration
    -------------
    Define as appropriate for your system.
    Sensible defaults provided.
 */
+
+
+#ifndef TIME64_CONFIG_H
+#    define TIME64_CONFIG_H
 
 /* Debugging
    TIME_64_DEBUG
@@ -93,9 +94,9 @@
    constant is defined.
 */
 #define SYSTEM_LOCALTIME_MAX     2147483647
-#define SYSTEM_LOCALTIME_MIN    -2147483648
+#define SYSTEM_LOCALTIME_MIN    -2147483647-1
 #define SYSTEM_GMTIME_MAX        2147483647
-#define SYSTEM_GMTIME_MIN       -2147483648
+#define SYSTEM_GMTIME_MIN       -2147483647-1
 #define SYSTEM_MKTIME_MAX        { 7, 14, 19, 18, 0, 138 }
 #define SYSTEM_MKTIME_MIN        { 52, 45, 12, 13, 11, 1 }
 #ifdef HAS_TIMEGM
