@@ -24,8 +24,12 @@ t/mktime64.t
 t/negative.t
 t/overflow.t
 t/safe_year.t
-t/safe_year.t.dSYM/
+t/seconds_between_years.t
 t/timegm.t
 t/year_limit.t
 bin/check_max
 
+# OS X debugging directories
+t/*.dSYM/
+bin/*.dSYM/
+*.dSYM/
