@@ -21,6 +21,8 @@ int main(void) {
     mktime64_ok((Time64_T)-60*60*24*365*143);
     mktime64_ok((Time64_T)60*60*24*365*433);
     mktime64_ok((Time64_T)-60*60*24*365*433);
+    mktime64_ok((Time64_T)-2147483647);
+    mktime64_ok((Time64_T)2147483647);
 
     /* Test timelocal64 alias to mktime64 */
     time = 12345;
