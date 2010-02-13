@@ -136,7 +136,7 @@ SYSTEM_TIMEGM_MIN_TM_ISDST
 ,""
 #endif
 };
-#endif HAS_TIMEGM
+#endif /* HAS_TIMEGM */
 
 
 /* Spec says except for stftime() and the _r() functions, these
