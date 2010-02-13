@@ -15,6 +15,7 @@ sub probe_system_time {
 sub note_time_capabilities {
     my $self = shift;
 
+    return if $self->up_to_date(["Build", "y2038/time64_config.h.in"], ["y2038/time64_config.h"]);
     my %tests = (
         HAS_TIMEGM      => <<'END',
     struct tm *date;
@@ -55,6 +56,8 @@ END
 END
     );
 
+    warn "Probing time.h capabilities.\n";
+    warn "You may see some C errors, that's ok.\n";
     my $cb = ExtUtils::CBuilder->new( quiet => 1 );
     for my $test (keys %tests) {
         my $code = $tests{$test};
