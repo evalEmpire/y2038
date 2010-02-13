@@ -20,12 +20,12 @@ name: Time-y2038
 provides:
   Time::y2038:
     file: lib/Time/y2038.pm
-    version: 20100213.0000_01
+    version: 20100213.0504_02
   Time::y2038::Everywhere:
     file: lib/Time/y2038/Everywhere.pm
-    version: 20100213.0000_01
+    version: 20100213.0504_02
 requires:
   perl: v5.6.1
 resources:
   license: http://dev.perl.org/licenses/
-version: 20100213.0000_01
+version: 20100213.0504_02

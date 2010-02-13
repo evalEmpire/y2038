@@ -1,3 +1,9 @@
+20100213.0504_02  Sat Feb 13 05:04:39 PST 2010
+  Build
+  * The check for the minimum time and date was broken and would only
+    do a single check.
+
+
 20100213.0000_01  Sat Feb 13 04:32:59 PST 2010
   Improvements
   * mktime() and timelocal() will now make better use of the system
