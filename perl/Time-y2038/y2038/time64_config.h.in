@@ -46,9 +46,15 @@
    HAS_TIMEGM
    Define if your system has timegm(), a GNU extension.
 */
+#if %%HAS_GMTIME_R%%
 #define HAS_GMTIME_R
+#endif
+#if %%HAS_LOCALTIME_R%%
 #define HAS_LOCALTIME_R
-/* #define HAS_TIMEGM */
+#endif
+#if %%HAS_TIMEGM%%
+#define HAS_TIMEGM
+#endif
 
 
 /* Details of non-standard tm struct elements.
@@ -61,8 +67,12 @@
    True if your tm struct has a "tm_zone" element.
    A BSD extension.
 */
-/* #define HAS_TM_TM_GMTOFF */
-/* #define HAS_TM_TM_ZONE   */
+#if %%HAS_TM_TM_GMTOFF%%
+#define HAS_TM_TM_GMTOFF
+#endif
+#if %%HAS_TM_TM_ZONE%%
+#define HAS_TM_TM_ZONE
+#endif
 
 
 /* USE_SYSTEM_LOCALTIME

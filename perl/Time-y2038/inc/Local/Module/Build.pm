@@ -3,6 +3,7 @@ package Local::Module::Build;
 use strict;
 use base qw(Module::Build);
 
+use ExtUtils::CBuilder;
 use JSON::XS;
 
 sub probe_system_time {
@@ -52,8 +53,31 @@ END
     date = gmtime(&zero);
     zone = date->tm_zone;
 END
-
     );
+
+    my $cb = ExtUtils::CBuilder->new( quiet => 1 );
+    for my $test (keys %tests) {
+        my $code = $tests{$test};
+
+        $code = <<END;
+#include <time.h>
+
+int main() {
+$code
+
+    return 0;
+}
+END
+
+        open my $fh, ">", "try.c" or die "Can't write try.c: $!";
+        print $fh $code;
+        close $fh;
+
+        my $obj = eval { $cb->compile(source => "try.c"); };
+        $self->notes($test, $obj ? 1 : 0);
+        unlink $obj if $obj;
+        unlink "try.c";
+    }
 }
 
 
