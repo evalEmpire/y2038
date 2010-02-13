@@ -85,7 +85,7 @@ time_t check_date_min( struct tm * (*date_func)(const time_t *), const char *fun
             good_time = time;
             time += time_change;
         }
-    } while((time_change > 0) && (good_time > Time_Min));
+    } while((time_change < 0) && (good_time > Time_Min));
 
     return(good_time);
 }
@@ -155,7 +155,7 @@ struct tm * check_to_time_min( time_t (*to_time)(struct tm *), const char *func_
             memcpy(good_date, date, sizeof(struct tm));
             time += time_change;
         }
-    } while((time_change > 0) && (good_time > Time_Min));
+    } while((time_change < 0) && (good_time > Time_Min));
 
     return(good_date);
 }
