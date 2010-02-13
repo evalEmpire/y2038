@@ -1,9 +1,8 @@
-#include <time.h>
-#include "time64_config.h"
-
 #ifndef TIME64_H
 #    define TIME64_H
 
+#include <time.h>
+#include "time64_config.h"
 
 /* Set our custom types */
 typedef INT_64_T        Int64;

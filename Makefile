@@ -10,7 +10,7 @@ all : bin/check_max
 
 bin/check_max : $(TIME64_OBJECTS) time64_config.h
 
-time64.o : time64_config.h time64.h Makefile
+time64.o : time64_config.h time64_limits.h time64.h Makefile
 
 bench : t/bench t/bench_system
 	time t/bench_system

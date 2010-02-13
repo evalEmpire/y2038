@@ -19,10 +19,6 @@ my $build = Local::Module::Build->new(
 
 #    extra_compiler_flags => "-g -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion",
 
-    PL_files => {
-        'munge_config'  => 'y2038/time64_config.h'
-    },
-
     configure_requires  => {
         'Module::Build'         => '0.2808',
     },
@@ -38,8 +34,6 @@ my $build = Local::Module::Build->new(
     requires            => {
         perl                    => '5.6.1'
     },
-
-    add_to_cleanup      => [qw(check_max.o check_max y2038/time64_config.h)],
 );
 
 $build->create_build_script;

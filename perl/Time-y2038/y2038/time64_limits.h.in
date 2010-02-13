@@ -1,0 +1,88 @@
+/* 
+   Maximum and minimum inputs your system's respective time functions
+   can correctly handle.  time64.h will use your system functions if
+   the input falls inside these ranges and corresponding USE_SYSTEM_*
+   constant is defined.
+*/
+
+#ifndef TIME64_LIMITS_H
+#define TIME64_LIMITS_H
+
+/* Max/min for localtime() */
+#define SYSTEM_LOCALTIME_MAX    %%localtime_max%%
+#define SYSTEM_LOCALTIME_MIN    %%localtime_min%%
+
+/* Max/min for gmtime() */
+#define SYSTEM_GMTIME_MAX       %%gmtime_max%%
+#define SYSTEM_GMTIME_MIN       %%gmtime_min%%
+
+/* Max/min for mktime() */
+#define SYSTEM_MKTIME_MAX_TM_SEC        %%mktime_max_tm_sec%%
+#define SYSTEM_MKTIME_MAX_TM_MIN        %%mktime_max_tm_min%%
+#define SYSTEM_MKTIME_MAX_TM_HOUR       %%mktime_max_tm_hour%%
+#define SYSTEM_MKTIME_MAX_TM_MDAY       %%mktime_max_tm_mday%%
+#define SYSTEM_MKTIME_MAX_TM_MON        %%mktime_max_tm_mon%%
+#define SYSTEM_MKTIME_MAX_TM_YEAR       %%mktime_max_tm_year%%
+#define SYSTEM_MKTIME_MAX_TM_WDAY       %%mktime_max_tm_wday%%
+#define SYSTEM_MKTIME_MAX_TM_YDAY       %%mktime_max_tm_yday%%
+#define SYSTEM_MKTIME_MAX_TM_ISDST      %%mktime_max_tm_isdst%%
+#ifdef HAS_TM_TM_ZONE
+    #define SYSTEM_MKTIME_MAX_TM_ZONE   "%%mktime_max_tm_zone%%"
+#endif
+#ifdef HAS_TM_TM_GMTOFF
+    #define SYSTEM_MKTIME_MAX_TM_GMTOFF %%mktime_max_tm_gmtoff%%
+#endif
+
+#define SYSTEM_MKTIME_MIN_TM_SEC        %%mktime_min_tm_sec%%
+#define SYSTEM_MKTIME_MIN_TM_MIN        %%mktime_min_tm_min%%
+#define SYSTEM_MKTIME_MIN_TM_HOUR       %%mktime_min_tm_hour%%
+#define SYSTEM_MKTIME_MIN_TM_MDAY       %%mktime_min_tm_mday%%
+#define SYSTEM_MKTIME_MIN_TM_MON        %%mktime_min_tm_mon%%
+#define SYSTEM_MKTIME_MIN_TM_YEAR       %%mktime_min_tm_year%%
+#define SYSTEM_MKTIME_MIN_TM_WDAY       %%mktime_min_tm_wday%%
+#define SYSTEM_MKTIME_MIN_TM_YDAY       %%mktime_min_tm_yday%%
+#define SYSTEM_MKTIME_MIN_TM_ISDST      %%mktime_min_tm_isdst%%
+#ifdef HAS_TM_TM_ZONE
+    #define SYSTEM_MKTIME_MIN_TM_ZONE   "%%mktime_min_tm_zone%%"
+#endif
+#ifdef HAS_TM_TM_GMTOFF
+    #define SYSTEM_MKTIME_MIN_TM_GMTOFF %%mktime_min_tm_gmtoff%%
+#endif
+
+
+/* Max/min for timegm() */
+#ifdef HAS_TIMEGM
+    #define SYSTEM_TIMEGM_MAX_TM_SEC        %%timegm_max_tm_sec%%
+    #define SYSTEM_TIMEGM_MAX_TM_MIN        %%timegm_max_tm_min%%
+    #define SYSTEM_TIMEGM_MAX_TM_HOUR       %%timegm_max_tm_hour%%
+    #define SYSTEM_TIMEGM_MAX_TM_MDAY       %%timegm_max_tm_mday%%
+    #define SYSTEM_TIMEGM_MAX_TM_MON        %%timegm_max_tm_mon%%
+    #define SYSTEM_TIMEGM_MAX_TM_YEAR       %%timegm_max_tm_year%%
+    #define SYSTEM_TIMEGM_MAX_TM_WDAY       %%timegm_max_tm_wday%%
+    #define SYSTEM_TIMEGM_MAX_TM_YDAY       %%timegm_max_tm_yday%%
+    #define SYSTEM_TIMEGM_MAX_TM_ISDST      %%timegm_max_tm_isdst%%
+    #ifdef HAS_TM_TM_ZONE
+        #define SYSTEM_TIMEGM_MAX_TM_ZONE   "%%timegm_max_tm_zone%%"
+    #endif
+    #ifdef HAS_TM_TM_GMTOFF
+        #define SYSTEM_TIMEGM_MAX_TM_GMTOFF %%timegm_max_tm_gmtoff%%
+    #endif
+    
+    #define SYSTEM_TIMEGM_MIN_TM_SEC        %%timegm_min_tm_sec%%
+    #define SYSTEM_TIMEGM_MIN_TM_MIN        %%timegm_min_tm_min%%
+    #define SYSTEM_TIMEGM_MIN_TM_HOUR       %%timegm_min_tm_hour%%
+    #define SYSTEM_TIMEGM_MIN_TM_MDAY       %%timegm_min_tm_mday%%
+    #define SYSTEM_TIMEGM_MIN_TM_MON        %%timegm_min_tm_mon%%
+    #define SYSTEM_TIMEGM_MIN_TM_YEAR       %%timegm_min_tm_year%%
+    #define SYSTEM_TIMEGM_MIN_TM_WDAY       %%timegm_min_tm_wday%%
+    #define SYSTEM_TIMEGM_MIN_TM_YDAY       %%timegm_min_tm_yday%%
+    #define SYSTEM_TIMEGM_MIN_TM_ISDST      %%timegm_min_tm_isdst%%
+    #ifdef HAS_TM_TM_ZONE
+        #define SYSTEM_TIMEGM_MIN_TM_ZONE   "%%timegm_min_tm_zone%%"
+    #endif
+    #ifdef HAS_TM_TM_GMTOFF
+        #define SYSTEM_TIMEGM_MIN_TM_GMTOFF %%timegm_min_tm_gmtoff%%
+    #endif
+#endif
+
+#endif /* TIME64_LIMITS_H */

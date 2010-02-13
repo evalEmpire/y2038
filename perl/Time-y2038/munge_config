@@ -7,8 +7,9 @@ my $build = Module::Build->current;
 
 my %config = (%Config, $build->notes);
 
+my $input_file  = shift;
 my $output_file = shift;
-my $input_file  = $output_file . ".in";
+
 
 open my $input_fh, $input_file          or die "Can't open $input_file: $!";
 open my $output_fh, ">$output_file"     or die "Can't open $output_file: $!";

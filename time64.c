@@ -46,6 +46,97 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 #include <time.h>
 #include <errno.h>
 #include "time64.h"
+#include "time64_limits.h"
+
+struct tm SYSTEM_MKTIME_MAX = {
+SYSTEM_MKTIME_MAX_TM_SEC,
+SYSTEM_MKTIME_MAX_TM_MIN, 
+SYSTEM_MKTIME_MAX_TM_HOUR, 
+SYSTEM_MKTIME_MAX_TM_MDAY,
+SYSTEM_MKTIME_MAX_TM_MON,
+SYSTEM_MKTIME_MAX_TM_YEAR,
+SYSTEM_MKTIME_MAX_TM_WDAY,
+SYSTEM_MKTIME_MAX_TM_YDAY,
+SYSTEM_MKTIME_MAX_TM_ISDST
+#ifdef HAS_TM_TM_GMTOFF
+,SYSTEM_MKTIME_MAX_TM_GMTOFF
+#else
+,0
+#endif
+#ifdef HAS_TM_TM_ZONE
+,SYSTEM_MKTIME_MAX_TM_ZONE
+#else
+,""
+#endif
+};
+
+const struct tm SYSTEM_MKTIME_MIN = {
+SYSTEM_MKTIME_MIN_TM_SEC,
+SYSTEM_MKTIME_MIN_TM_MIN, 
+SYSTEM_MKTIME_MIN_TM_HOUR, 
+SYSTEM_MKTIME_MIN_TM_MDAY,
+SYSTEM_MKTIME_MIN_TM_MON,
+SYSTEM_MKTIME_MIN_TM_YEAR,
+SYSTEM_MKTIME_MIN_TM_WDAY,
+SYSTEM_MKTIME_MIN_TM_YDAY,
+SYSTEM_MKTIME_MIN_TM_ISDST
+#ifdef HAS_TM_TM_GMTOFF
+,SYSTEM_MKTIME_MIN_TM_GMTOFF
+#else
+,0
+#endif
+#ifdef HAS_TM_TM_ZONE
+,SYSTEM_MKTIME_MIN_TM_ZONE
+#else
+,""
+#endif
+};
+
+#ifdef HAS_TIMEGM
+const struct tm SYSTEM_TIMEGM_MAX = {
+SYSTEM_TIMEGM_MAX_TM_SEC,
+SYSTEM_TIMEGM_MAX_TM_MIN, 
+SYSTEM_TIMEGM_MAX_TM_HOUR, 
+SYSTEM_TIMEGM_MAX_TM_MDAY,
+SYSTEM_TIMEGM_MAX_TM_MON,
+SYSTEM_TIMEGM_MAX_TM_YEAR,
+SYSTEM_TIMEGM_MAX_TM_WDAY,
+SYSTEM_TIMEGM_MAX_TM_YDAY,
+SYSTEM_TIMEGM_MAX_TM_ISDST
+#ifdef HAS_TM_TM_GMTOFF
+,SYSTEM_TIMEGM_MAX_TM_GMTOFF
+#else
+,0
+#endif
+#ifdef HAS_TM_TM_ZONE
+,SYSTEM_TIMEGM_MAX_TM_ZONE
+#else
+,""
+#endif
+};
+
+const struct tm SYSTEM_TIMEGM_MIN = {
+SYSTEM_TIMEGM_MIN_TM_SEC,
+SYSTEM_TIMEGM_MIN_TM_MIN, 
+SYSTEM_TIMEGM_MIN_TM_HOUR, 
+SYSTEM_TIMEGM_MIN_TM_MDAY,
+SYSTEM_TIMEGM_MIN_TM_MON,
+SYSTEM_TIMEGM_MIN_TM_YEAR,
+SYSTEM_TIMEGM_MIN_TM_WDAY,
+SYSTEM_TIMEGM_MIN_TM_YDAY,
+SYSTEM_TIMEGM_MIN_TM_ISDST
+#ifdef HAS_TM_TM_GMTOFF
+,SYSTEM_TIMEGM_MIN_TM_GMTOFF
+#else
+,0
+#endif
+#ifdef HAS_TM_TM_ZONE
+,SYSTEM_TIMEGM_MIN_TM_ZONE
+#else
+,""
+#endif
+};
+#endif HAS_TIMEGM
 
 
 /* Spec says except for stftime() and the _r() functions, these
@@ -168,6 +259,59 @@ static int is_exception_century(Year year)
     TIME64_TRACE1("# is_exception_century: %s\n", is_exception ? "yes" : "no");
 
     return(is_exception);
+}
+
+
+/* Compare two dates.
+   The result is like cmp.
+   Ignores things like gmtoffset and dst
+*/
+int cmp_date( const struct TM* left, const struct tm* right ) {
+    if( left->tm_year > right->tm_year )
+        return 1;
+    else if( left->tm_year < right->tm_year )
+        return -1;
+
+    if( left->tm_mon > right->tm_mon )
+        return 1;
+    else if( left->tm_mon < right->tm_mon )
+        return -1;
+
+    if( left->tm_mday > right->tm_mday )
+        return 1;
+    else if( left->tm_mday < right->tm_mday )
+        return -1;
+
+    if( left->tm_hour > right->tm_hour )
+        return 1;
+    else if( left->tm_hour < right->tm_hour )
+        return -1;
+
+    if( left->tm_min > right->tm_min )
+        return 1;
+    else if( left->tm_min < right->tm_min )
+        return -1;
+
+    if( left->tm_sec > right->tm_sec )
+        return 1;
+    else if( left->tm_sec < right->tm_sec )
+        return -1;
+
+    return 0;
+}
+
+
+/* Check if a date is safely inside a range.
+   The intention is to check if its a few days inside.
+*/
+int date_in_safe_range( const struct TM* date, const struct tm* min, const struct tm* max ) {
+    if( cmp_date(date, min) == -1 )
+        return 0;
+
+    if( cmp_date(date, max) == 1 )
+        return 0;
+
+    return 1;
 }
 
 
@@ -467,7 +611,9 @@ Time64_T mktime64(const struct TM *input_date) {
     Time64_T  time;
     Year      year = input_date->tm_year + 1900;
 
-    if( MIN_SAFE_YEAR <= year && year <= MAX_SAFE_YEAR ) {
+    if( date_in_safe_range(input_date, &SYSTEM_MKTIME_MIN, &SYSTEM_MKTIME_MAX) )
+    {
+        printf("Using system mktime\n");
         copy_TM64_to_tm(input_date, &safe_date);
         return (Time64_T)mktime(&safe_date);
     }

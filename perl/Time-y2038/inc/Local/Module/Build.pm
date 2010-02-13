@@ -8,14 +8,25 @@ use JSON::XS;
 
 sub probe_system_time {
     my $self = shift;
-    $self->note_time_limits;
     $self->note_time_capabilities;
+    $self->munge("y2038/time64_config.h.in" => "y2038/time64_config.h");
+    $self->note_time_limits;
+    $self->munge("y2038/time64_limits.h.in" => "y2038/time64_limits.h");
+}
+
+sub munge {
+    my $self = shift;
+    my($src, $dest) = @_;
+
+    return if $self->up_to_date(["munge_config",$src] => [$dest]);
+    system $^X, "munge_config", $src, $dest;
+    $self->add_to_cleanup($dest);
 }
 
 sub note_time_capabilities {
     my $self = shift;
 
-    return if $self->up_to_date(["Build", "y2038/time64_config.h.in"], ["y2038/time64_config.h"]);
+    return if $self->up_to_date(["Build", "y2038/time64_limits.h.in"], ["y2038/time64_limits.h"]);
     my %tests = (
         HAS_TIMEGM      => <<'END',
     struct tm *date;
@@ -96,7 +107,7 @@ sub note_time_limits {
         $exe = $cb->link_executable(objects => $obj, exe_file => $exe);
         $exe = $self->find_real_exe($exe);
         $self->notes(check_max => $exe);
-        $self->add_to_cleanup($exe);
+        $self->add_to_cleanup($obj, $exe);
     }
 
     return if $self->up_to_date(["y2038/time64_config.h.in", "munge_config", $exe]

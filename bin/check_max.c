@@ -1,5 +1,6 @@
 /* A little program to test the limits of your system's time functions */
 
+#include "time64_config.h"
 #include <time.h>
 #include <stdio.h>
 #include <math.h>
@@ -204,7 +205,7 @@ char * tm_as_json(const struct tm* date) {
     );
 
 #ifdef HAS_TM_TM_ZONE
-    sprintf(zone_json, ", \"tm_zone\": %s", date->tm_zone);
+    sprintf(zone_json, ", \"tm_zone\": \"%s\"", date->tm_zone);
     strcat(date_json, zone_json);
 #endif
 #ifdef HAS_TM_TM_GMTOFF
