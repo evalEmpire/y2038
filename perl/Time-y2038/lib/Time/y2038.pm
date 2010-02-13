@@ -6,7 +6,7 @@ use warnings;
 use base qw(Exporter);
 use XSLoader;
 
-our $VERSION = 20081111;
+our $VERSION = '20100213.0000_01';
 our @EXPORT = qw(localtime gmtime timegm timelocal);
 
 XSLoader::load __PACKAGE__, $VERSION;

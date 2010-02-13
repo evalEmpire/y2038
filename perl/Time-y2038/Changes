@@ -1,13 +1,18 @@
-Next
-  Build Fixes
-  * Had too old a version of Module::Build listed as the requirement.
+20100213.0000_01  Sat Feb 13 04:32:59 PST 2010
+  Improvements
+  * mktime() and timelocal() will now make better use of the system
+    functions giving better accuracy.
 
-  Build Improvements
+  Build
+  * Had too old a version of Module::Build listed as the requirement.
   * The limit check program was ignoring a limit of 0.  Duh.
   * Fix so the check_max program is not always re-run on Cygwin.
 
-  Test Improvements
+  Tests
   * More localtime() tests to track down the 64 bit issues
+  * Failures on 64 bit systems, especially in the UK, should
+    be fixed
+  * More sanity tests for distant dates
 
 
 20081111  Tue Nov 11 15:36:27 PST 2008

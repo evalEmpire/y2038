@@ -17,3 +17,4 @@ typemap
 y2038/time64.c
 y2038/time64.h
 y2038/time64_config.h.in
+y2038/time64_limits.h.in
