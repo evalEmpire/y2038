@@ -27,8 +27,9 @@ my $build = Local::Module::Build->new(
         'Module::Build'         => '0.2809',    # for ->cbuilder()
         'Test::Warn'            => '0.11',
         'Test::Exception'       => '0.27',
-        'Test::More'            => 0.62,
+        'Test::More'            => 0.82,
         'ExtUtils::CBuilder'    => 0.24,
+        'JSON::XS'              => 2.26,
     },
 
     requires            => {
