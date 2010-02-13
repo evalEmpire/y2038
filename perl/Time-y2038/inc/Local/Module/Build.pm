@@ -3,6 +3,60 @@ package Local::Module::Build;
 use strict;
 use base qw(Module::Build);
 
+use JSON::XS;
+
+sub probe_system_time {
+    my $self = shift;
+    $self->note_time_limits;
+    $self->note_time_capabilities;
+}
+
+sub note_time_capabilities {
+    my $self = shift;
+
+    my %tests = (
+        HAS_TIMEGM      => <<'END',
+    struct tm *date;
+    time_t zero;
+
+    date = localtime(&zero);
+    zero = timegm(date);
+END
+
+        HAS_GMTIME_R    => <<'END',
+    struct tm date;
+    time_t zero = 0;
+    (void)gmtime_r(&zero, &date);
+END
+
+        HAS_LOCALTIME_R => <<'END',
+    struct tm date;
+    time_t zero = 0;
+    (void)localtime_r(&zero, &date);
+END
+
+        HAS_TM_TM_GMTOFF => <<'END',
+    struct tm *date;
+    time_t zero;
+    int offset;
+
+    date = gmtime(&zero);
+    offset = date->tm_gmtoff;
+END
+
+        HAS_TM_TM_ZONE => <<'END',
+    struct tm *date;
+    time_t zero;
+    char *zone;
+
+    date = gmtime(&zero);
+    zone = date->tm_zone;
+END
+
+    );
+}
+
+
 sub note_time_limits {
     my $self = shift;
 
@@ -22,37 +76,40 @@ sub note_time_limits {
                                 => "y2038/time64_config.h");
     warn "  and running it...\n";
 
-    my @maxes = `./$exe`;
-    chomp @maxes;
+    my $json = `./$exe`;
+    $json =~ s{^\#.*\n}{}gm;
+    my $limits = decode_json($json);
 
     warn "  Done.\n";
 
-    my %limits;
-    for my $line (@maxes) {
-        next if $line =~ /^#/;          # comment
-        next if $line !~ /\S/;          # blank line
+    my %config;
+    for my $key (qw(gmtime localtime)) {
+        for my $limit (qw(min max)) {
+            $config{$key."_".$limit} = $limits->{$key}{$limit};
+        }
+    }
 
-        my($key, $time, $date) = split /\s+/, $line, 3;
-        $limits{$key} = { time => $time, date => $date };
+    for my $key (qw(mktime timegm)) {
+        for my $limit (qw(min max)) {
+            my $struct = $limits->{$key}{$limit};
+            for my $tm (keys %$struct) {
+                $config{$key."_".$limit."_".$tm} = $struct->{$tm};
+            }
+        }
     }
 
     # Windows lies about being able to handle just a little bit of
     # negative time.
     for my $key (qw(gmtime_min localtime_min)) {
-        if( -10_000 < $limits{$key}{time} && $limits{$key}{time} < 0 ) {
-            $limits{$key}{time} = 0;
+        if( -10_000 < $config{$key} && $config{$key} < 0 ) {
+            $config{$key} = 0;
         }
     }
 
-    $limits{timegm_max} ||= { time => 0, date => "{}" };
-    $limits{timegm_min} ||= { time => 0, date => "{}" };
-
-    for my $key (sort { $a cmp $b } keys %limits) {
-        my $time = $limits{$key}{time};
-        my $date = $limits{$key}{date};
-        my $val = defined $date ? $date : $time;
+    for my $key (sort { $a cmp $b } keys %config) {
+        my $val = $config{$key};
         warn sprintf "%15s:  %s\n", $key, $val;
-        $self->notes($key, $val);
+        $self->notes($key, "$val");
     }
 
     return;
@@ -80,7 +137,7 @@ sub find_real_exe {
 sub ACTION_code {
     my $self = shift;
 
-    $self->note_time_limits;
+    $self->probe_system_time;
 
     return $self->SUPER::ACTION_code(@_);
 }

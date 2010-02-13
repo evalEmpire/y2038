@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct tm Test_TM;
 
@@ -56,7 +57,6 @@ time_t check_date_max( struct tm * (*date_func)(const time_t *), const char *fun
         }
     } while(time_change > 0 && good_time < Time_Max);
 
-    printf("%s_max %.0f\n", func_name, my_difftime(good_time, Time_Zero));
     return(good_time);
 }
 
@@ -86,19 +86,18 @@ time_t check_date_min( struct tm * (*date_func)(const time_t *), const char *fun
         }
     } while((time_change > 0) && (good_time > Time_Min));
 
-    printf("%s_min %.0f\n", func_name, my_difftime(good_time, Time_Zero));
     return(good_time);
 }
 
 
-time_t check_to_time_max( time_t (*to_time)(struct tm *), const char *func_name,
+struct tm * check_to_time_max( time_t (*to_time)(struct tm *), const char *func_name,
                           struct tm * (*to_date)(const time_t *) )
 {
     time_t round_trip;
     time_t time        = Time_Max;
     time_t good_time   = 0;
     struct tm *date;
-    struct tm *good_date;
+    struct tm *good_date = malloc(sizeof(struct tm));
     time_t time_change = Time_Max;
 
     /* Binary search for the exact failure point */
@@ -117,24 +116,23 @@ time_t check_to_time_max( time_t (*to_time)(struct tm *), const char *func_name,
         else {
             printf(" success\n");
             good_time = time;
-            good_date = date;
+            memcpy(good_date, date, sizeof(struct tm));
             time += time_change;
         }
     } while(time_change > 0 && good_time < Time_Max);
 
-    printf("%s_max %.0f %s\n", func_name, my_difftime(good_time, Time_Zero), dump_date(good_date));
-    return(good_time);
+    return(good_date);
 }
 
 
-time_t check_to_time_min( time_t (*to_time)(struct tm *), const char *func_name,
+struct tm * check_to_time_min( time_t (*to_time)(struct tm *), const char *func_name,
                           struct tm * (*to_date)(const time_t *) )
 {
     time_t round_trip;
     time_t time        = Time_Min;
     time_t good_time   = 0;
     struct tm *date;
-    struct tm *good_date;
+    struct tm *good_date = malloc(sizeof(struct tm));
     time_t time_change = Time_Min;
 
     /* Binary search for the exact failure point */
@@ -153,13 +151,12 @@ time_t check_to_time_min( time_t (*to_time)(struct tm *), const char *func_name,
         else {
             printf(" success\n");
             good_time = time;
-            good_date = date;
+            memcpy(good_date, date, sizeof(struct tm));
             time += time_change;
         }
     } while((time_change > 0) && (good_time > Time_Min));
 
-    printf("%s_min %.0f %s\n", func_name, my_difftime(good_time, Time_Zero), dump_date(good_date));
-    return(good_time);
+    return(good_date);
 }
 
 
@@ -190,11 +187,46 @@ void guess_time_limits_from_types(void) {
 }
 
 
+/* Dump a tm struct as a json fragment */
+char * tm_as_json(const struct tm* date) {
+    char *date_json = malloc(sizeof(char) * 512);
+#ifdef HAS_TM_TM_ZONE
+    char zone_json[32];
+#endif
+#ifdef HAS_TM_TM_GMTOFF
+    char gmtoff_json[32];
+#endif
+
+    sprintf(date_json,
+            "\"tm_sec\": %d, \"tm_min\": %d, \"tm_hour\": %d, \"tm_mday\": %d, \"tm_mon\": %d, \"tm_year\": %d, \"tm_wday\": %d, \"tm_yday\": %d, \"tm_isdst\": %d",
+            date->tm_sec, date->tm_min, date->tm_hour, date->tm_mday,
+            date->tm_mon, date->tm_year, date->tm_wday, date->tm_yday, date->tm_isdst
+    );
+
+#ifdef HAS_TM_TM_ZONE
+    sprintf(zone_json, ", \"tm_zone\": %s", date->tm_zone);
+    strcat(date_json, zone_json);
+#endif
+#ifdef HAS_TM_TM_GMTOFF
+    sprintf(gmtoff_json, ", \"tm_gmtoff\": %ld", date->tm_gmtoff);
+    strcat(date_json, gmtoff_json);
+#endif
+
+    return date_json;
+}
+
+
 int main(void) {
     time_t gmtime_max;
     time_t gmtime_min;
     time_t localtime_max;
     time_t localtime_min;
+#ifdef HAS_TIMEGM
+    struct tm* timegm_max;
+    struct tm* timegm_min;
+#endif
+    struct tm* mktime_max;
+    struct tm* mktime_min;
 
     guess_time_limits_from_types();
 
@@ -207,14 +239,42 @@ int main(void) {
 #ifdef HAS_TIMEGM
     Time_Max = gmtime_max;
     Time_Min = gmtime_min;
-    check_to_time_max(timegm, "timegm", gmtime);
-    check_to_time_min(timegm, "timegm", gmtime);
+    timegm_max = check_to_time_max(timegm, "timegm", gmtime);
+    timegm_min = check_to_time_min(timegm, "timegm", gmtime);
 #endif
 
     Time_Max = localtime_max;
     Time_Min = localtime_min;
-    check_to_time_max(mktime, "mktime", localtime);
-    check_to_time_min(mktime, "mktime", localtime);
+    mktime_max = check_to_time_max(mktime, "mktime", localtime);
+    mktime_min = check_to_time_min(mktime, "mktime", localtime);
+
+    printf("# system time.h limits, as JSON\n");
+    printf("{\n");
+
+    printf("    \"gmtime\": { \"max\": %.0f, \"min\": %0.f },\n",
+           my_difftime(gmtime_max, Time_Zero),
+           my_difftime(gmtime_min, Time_Zero)
+    );
+
+    printf("    \"localtime\": { \"max\": %.0f, \"min\": %0.f },\n",
+           my_difftime(localtime_max, Time_Zero),
+           my_difftime(localtime_min, Time_Zero)
+    );
+
+    printf("    \"mktime\": {\n");
+    printf("        \"max\": { %s },\n", tm_as_json(mktime_max));
+    printf("        \"min\": { %s }\n", tm_as_json(mktime_min));
+    printf("    }\n");
+
+#ifdef HAS_TIMEGM
+    printf("    ,\n");
+    printf("    \"timegm\": {\n");
+    printf("        \"max\": { %s },\n", tm_as_json(timegm_max));
+    printf("        \"min\": { %s }\n", tm_as_json(timegm_min));
+    printf("    }\n");
+#endif
+
+    printf("}\n");
 
     return 0;
 }
