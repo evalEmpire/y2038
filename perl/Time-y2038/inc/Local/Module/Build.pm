@@ -4,7 +4,7 @@ use strict;
 use base qw(Module::Build);
 
 use ExtUtils::CBuilder;
-use JSON::XS;
+use JSON;
 
 sub probe_system_time {
     my $self = shift;
@@ -116,7 +116,7 @@ sub note_time_limits {
 
     my $json = `./$exe`;
     $json =~ s{^\#.*\n}{}gm;
-    my $limits = decode_json($json);
+    my $limits = from_json($json);
 
     warn "  Done.\n";
 

@@ -25,7 +25,7 @@ my $build = Local::Module::Build->new(
         'Test::Exception'       => '0.27',
         'Test::More'            => 0.82,
         'ExtUtils::CBuilder'    => 0.24,
-        'JSON::XS'              => 2.26,
+        'JSON'                  => 2.17,
     },
 
     configure_requires => {
