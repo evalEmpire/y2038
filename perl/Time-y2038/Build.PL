@@ -19,17 +19,17 @@ my $build = Local::Module::Build->new(
 
 #    extra_compiler_flags => "-g -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion",
 
-    configure_requires  => {
-        'Module::Build'         => '0.2808',
-    },
-
     build_requires      => {
-        'Module::Build'         => '0.2809',    # for ->cbuilder()
+        'Module::Build'         => '0.36',
         'Test::Warn'            => '0.11',
         'Test::Exception'       => '0.27',
         'Test::More'            => 0.82,
         'ExtUtils::CBuilder'    => 0.24,
         'JSON::XS'              => 2.26,
+    },
+
+    configure_requires => {
+        'Module::Build'         => '0.36'
     },
 
     requires            => {
