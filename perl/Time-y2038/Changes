@@ -7,6 +7,9 @@ Next
   * Work around bug in OS X 10.6 where gmtime() would be wrong
     before -70546986201600.
 
+  Test
+  * Add some more fuzz around the future localtime() tests.
+
 
 20100214.1823_03  Sun Feb 14 18:23:22 PST 2010
   Build
