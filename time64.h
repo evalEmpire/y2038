@@ -69,4 +69,13 @@ Time64_T   timelocal64   (const struct TM *);
 #    define GMTIME_R(clock, result)    fake_gmtime_r(clock, result)
 #endif
 
+
+/* Use a different asctime format depending on how big the year is */
+#ifdef USE_TM64
+    #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %lld\n"
+#else
+    #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n"
+#endif
+
+
 #endif
