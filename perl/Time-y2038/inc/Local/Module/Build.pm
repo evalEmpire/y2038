@@ -87,9 +87,15 @@ END
         print $fh $code;
         close $fh;
 
-        my $obj = eval { $cb->compile(source => "try.c"); };
-        $self->notes($test, $obj ? 1 : 0);
-        unlink $obj if $obj;
+        my $exe = eval {
+            # Compile AND link to force undefined symbols to error
+            my $obj = $cb->compile(source => "try.c");
+            my $exe = $cb->link_executable(objects => $obj, exe_file => "try");
+            unlink $obj;
+            $exe;
+        };
+        $self->notes($test, $exe ? 1 : 0);
+        unlink $exe if $exe;
         unlink "try.c";
     }
 }
