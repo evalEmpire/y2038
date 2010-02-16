@@ -4,6 +4,8 @@ Next
     Lehmann-ware dependency.
   * The test for the limits of the time.h did not work for
     finding functions.
+  * Work around bug in OS X 10.6 where gmtime() would be wrong
+    before -70546986201600.
 
 
 20100214.1823_03  Sun Feb 14 18:23:22 PST 2010

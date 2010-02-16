@@ -6,6 +6,12 @@ use base qw(Module::Build);
 use ExtUtils::CBuilder;
 use JSON;
 
+sub is_osx_106 {
+    return 0 unless $^O eq 'darwin';
+    my $version = `sw_vers -productVersion`;
+    return $version =~ m{^10\.6\.};
+}
+
 sub probe_system_time {
     my $self = shift;
     $self->note_time_capabilities;
@@ -147,6 +153,16 @@ sub note_time_limits {
     for my $key (qw(gmtime_min localtime_min)) {
         if( -10_000 < $config{$key} && $config{$key} < 0 ) {
             $config{$key} = 0;
+        }
+    }
+
+    # OS X 10.6's gmtime is broken before -70546986201600
+    # See Apple bug 7654647
+    if( is_osx_106 ) {
+        for my $key (qw(gmtime_min localtime_min)) {
+            if( $config{$key} < -70546986201600 ) {
+                $config{$key} = -70546986201600;
+            }
         }
     }
 
