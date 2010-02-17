@@ -168,7 +168,8 @@ static const int length_of_year[2] = { 365, 366 };
 /* Some numbers relating to the gregorian cycle */
 static const Year     years_in_gregorian_cycle   = 400;
 #define               days_in_gregorian_cycle      ((365 * 400) + 100 - 4 + 1)
-static const Time64_T seconds_in_gregorian_cycle = days_in_gregorian_cycle * 60LL * 60LL * 24LL;
+static const Time64_T seconds_in_gregorian_cycle = days_in_gregorian_cycle * \
+                                                   __LL(60) * __LL(60) * __LL(24);
 
 /* Year range we can trust the time funcitons with */
 #define MAX_SAFE_YEAR 2037

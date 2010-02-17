@@ -1,6 +1,6 @@
 /* A little program to test the limits of your system's time functions */
 
-#include "time64_config.h"
+#include "time64.h"
 #include <time.h>
 #include <stdio.h>
 #include <math.h>
@@ -173,13 +173,13 @@ void guess_time_limits_from_types(void) {
            below.  Don't worry, these won't get run in that case */
         if( sizeof(Test_TM.tm_year) == 4 ) {
             /* y2**31-1 bug */
-            Time_Max =  67768036160140799LL;
-            Time_Min = -67768036191676800LL;
+            Time_Max = __LL(67768036160140799);
+            Time_Min = __LL(-67768036191676800);
         }
         else {
             /* All the way out to 2**63-1 */
-            Time_Max =  9223372036854775807LL;
-            Time_Min = -9223372036854775807LL;
+            Time_Max = __LL(9223372036854775807);
+            Time_Min = __LL(-9223372036854775807);
         }
     }
     else {

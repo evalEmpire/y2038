@@ -39,6 +39,21 @@ struct TM64 {
 #define TM      tm
 #endif   
 
+/* Figure out how the C preprocessor concatenates */
+#if 42 == 1
+#define __CAT2(a,b)       a/**/b
+#endif
+#if 42 == 42
+#define __CATIFY(a, b)    a ## b
+#define __CAT2(a,b)       __CATIFY(a,b)
+#endif
+
+/* 1234LL is a C99 thing.  Some compilers don't like it. */
+#if defined( _MSC_VER ) && ( _MSC_VER <= 1300 )
+#define __LL(c)  __CAT2(c,I64)
+#else
+#define __LL(c)  __CAT2(c,LL)
+#endif
 
 /* Declare public functions */
 struct TM *gmtime64_r    (const Time64_T *, struct TM *);
@@ -76,6 +91,5 @@ Time64_T   timelocal64   (const struct TM *);
 #else
     #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n"
 #endif
-
 
 #endif
