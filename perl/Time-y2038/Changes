@@ -1,3 +1,22 @@
+20100218  Thu Feb 18 12:29:49 PST 2010
+  * No changes since the last alpha
+
+  Summary of Changes Since The Last Stable
+
+  Improvements
+  * System mktime() is now probed giving more accurate
+    mktime() on 64 bit systems.
+
+  Test
+  * Test fixes for 64 bit machines, OS X, BSD, people in the UK
+
+  Build
+  * Build fixes Versions of Visual C++ lacking long long
+  * Build fixes for Strawberry and any system with a time.h
+    limit of 0.
+  * Build fixes for slightly out of date Module::Build
+
+
 20100216.1421_04  Tue Feb 16 14:22:08 PST 2010
   Build
   * Switch dependency on JSON::XS to just JSON to eliminate

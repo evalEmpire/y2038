@@ -3,7 +3,7 @@ package Time::y2038::Everywhere;
 use strict;
 use warnings;
 
-our $VERSION = '20100216.1421_04';
+our $VERSION = '20100218';
 
 use Time::y2038;
 
