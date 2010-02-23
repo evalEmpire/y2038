@@ -4,7 +4,6 @@ use strict;
 use base qw(Module::Build);
 
 use ExtUtils::CBuilder;
-use JSON;
 
 sub is_osx_106 {
     return 0 unless $^O eq 'darwin';
@@ -126,9 +125,10 @@ sub note_time_limits {
                                 => "y2038/time64_limits.h");
     warn "  and running it...\n";
 
+    require JSON;
     my $json = `./$exe`;
     $json =~ s{^\#.*\n}{}gm;
-    my $limits = from_json($json);
+    my $limits = JSON::from_json($json);
 
     warn "  Done.\n";
 
