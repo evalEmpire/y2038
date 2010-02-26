@@ -613,7 +613,6 @@ Time64_T mktime64(const struct TM *input_date) {
 
     if( date_in_safe_range(input_date, &SYSTEM_MKTIME_MIN, &SYSTEM_MKTIME_MAX) )
     {
-        printf("Using system mktime\n");
         copy_TM64_to_tm(input_date, &safe_date);
         return (Time64_T)mktime(&safe_date);
     }

@@ -1,4 +1,7 @@
 Next
+  Bugs
+  * Accidentally left a debugging print in mktime()
+
   Tests
   * Test against 2006, before the American DST rules changed, so
     as not to break on old machines.
