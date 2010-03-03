@@ -118,7 +118,7 @@ Michael G Schwern <schwern@pobox.com>
 
 =head1 LICENSE & COPYRIGHT
 
-Copyright 2008 Michael G Schwern
+Copyright 2008-2010 Michael G Schwern
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

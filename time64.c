@@ -1,6 +1,6 @@
 /* 
 
-Copyright (c) 2007-2008  Michael G Schwern
+Copyright (c) 2007-2010  Michael G Schwern
 
 This software originally derived from Paul Sheer's pivotal_gmtime_r.c.
 
