@@ -17,71 +17,79 @@
 #define SYSTEM_GMTIME_MIN       -2147483647-1
 
 /* Max/min for mktime() */
-#define SYSTEM_MKTIME_MAX_TM_SEC        7
-#define SYSTEM_MKTIME_MAX_TM_MIN        14
-#define SYSTEM_MKTIME_MAX_TM_HOUR       19
-#define SYSTEM_MKTIME_MAX_TM_MDAY       18
-#define SYSTEM_MKTIME_MAX_TM_MON        0
-#define SYSTEM_MKTIME_MAX_TM_YEAR       138
-#define SYSTEM_MKTIME_MAX_TM_WDAY       1
-#define SYSTEM_MKTIME_MAX_TM_YDAY       17
-#define SYSTEM_MKTIME_MAX_TM_ISDST      0
-#ifdef HAS_TM_TM_ZONE
-    #define SYSTEM_MKTIME_MAX_TM_ZONE   "PST"
-#endif
+static const struct tm SYSTEM_MKTIME_MAX = {
+    7,
+    14,
+    19,
+    18,
+    0,
+    138,
+    1,
+    17,
+    0
 #ifdef HAS_TM_TM_GMTOFF
-    #define SYSTEM_MKTIME_MAX_TM_GMTOFF -28800
+    ,-28800
 #endif
+#ifdef HAS_TM_TM_ZONE
+    ,"PST"
+#endif
+};
 
-#define SYSTEM_MKTIME_MIN_TM_SEC        52
-#define SYSTEM_MKTIME_MIN_TM_MIN        45
-#define SYSTEM_MKTIME_MIN_TM_HOUR       12
-#define SYSTEM_MKTIME_MIN_TM_MDAY       13
-#define SYSTEM_MKTIME_MIN_TM_MON        11
-#define SYSTEM_MKTIME_MIN_TM_YEAR       1
-#define SYSTEM_MKTIME_MIN_TM_WDAY       5
-#define SYSTEM_MKTIME_MIN_TM_YDAY       346
-#define SYSTEM_MKTIME_MIN_TM_ISDST      0
-#ifdef HAS_TM_TM_ZONE
-    #define SYSTEM_MKTIME_MIN_TM_ZONE   "PST"
-#endif
+static const struct tm SYSTEM_MKTIME_MIN = {
+    52,
+    45,
+    12,
+    13,
+    11,
+    1,
+    5,
+    346,
+    0
 #ifdef HAS_TM_TM_GMTOFF
-    #define SYSTEM_MKTIME_MIN_TM_GMTOFF -28800
+    ,-28800
 #endif
+#ifdef HAS_TM_TM_ZONE
+    ,"PST"
+#endif
+};
 
 /* Max/min for timegm() */
 #ifdef HAS_TIMEGM
-    #define SYSTEM_TIMEGM_MAX_TM_SEC    7
-    #define SYSTEM_TIMEGM_MAX_TM_MIN    14
-    #define SYSTEM_TIMEGM_MAX_TM_HOUR   3
-    #define SYSTEM_TIMEGM_MAX_TM_MDAY   19
-    #define SYSTEM_TIMEGM_MAX_TM_MON    0
-    #define SYSTEM_TIMEGM_MAX_TM_YEAR   138
-    #define SYSTEM_TIMEGM_MAX_TM_WDAY   2
-    #define SYSTEM_TIMEGM_MAX_TM_YDAY   18
-    #define SYSTEM_TIMEGM_MAX_TM_ISDST  0
-    #ifdef HAS_TM_TM_ZONE
-        #define SYSTEM_TIMEGM_MAX_TM_ZONE       "UTC"
-    #endif
+static const struct tm SYSTEM_TIMEGM_MAX = {
+    7,
+    14,
+    3,
+    19,
+    0,
+    138,
+    2,
+    18,
+    0
     #ifdef HAS_TM_TM_GMTOFF
-        #define SYSTEM_TIMEGM_MAX_TM_GMTOFF     0
+        ,0
     #endif
+    #ifdef HAS_TM_TM_ZONE
+        ,"UTC"
+    #endif
+};
 
-    #define SYSTEM_TIMEGM_MIN_TM_SEC    52
-    #define SYSTEM_TIMEGM_MIN_TM_MIN    45
-    #define SYSTEM_TIMEGM_MIN_TM_HOUR   20
-    #define SYSTEM_TIMEGM_MIN_TM_MDAY   13
-    #define SYSTEM_TIMEGM_MIN_TM_MON    11
-    #define SYSTEM_TIMEGM_MIN_TM_YEAR   1
-    #define SYSTEM_TIMEGM_MIN_TM_WDAY   5
-    #define SYSTEM_TIMEGM_MIN_TM_YDAY   346
-    #define SYSTEM_TIMEGM_MIN_TM_ISDST  0
-    #ifdef HAS_TM_TM_ZONE
-        #define SYSTEM_TIMEGM_MIN_TM_ZONE       "UTC"
-    #endif
+static const struct tm SYSTEM_TIMEGM_MIN = {
+    52,
+    45,
+    20,
+    13,
+    11,
+    1,
+    5,
+    346,
+    0
     #ifdef HAS_TM_TM_GMTOFF
-        #define SYSTEM_TIMEGM_MIN_TM_GMTOFF     0
+        ,0
     #endif
-#endif
+    #ifdef HAS_TM_TM_ZONE
+        ,"UTC"
+    #endif
+};
+#endif /* HAS_TIMEGM */
 
 #endif /* TIME64_LIMITS_H */
