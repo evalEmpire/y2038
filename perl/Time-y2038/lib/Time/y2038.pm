@@ -132,4 +132,6 @@ L<Time::y2038::Everywhere> overrides localtime() and gmtime() across the whole p
 
 The y2038 project at F<http://y2038.googlecode.com/>
 
+L<http://xkcd.com/376/>
+
 =cut
