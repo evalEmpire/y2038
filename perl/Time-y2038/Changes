@@ -2,6 +2,7 @@ Next
   Bugs
   * strict compilers, like Sun's cc, would error because we passed
     too many elements to the tm struct.  [rt.cpan.org #55225]
+  * Ensure localtime() honors the TZ environment variable.
 
 
 20100225  Thu Feb 25 23:09:15 PST 2010

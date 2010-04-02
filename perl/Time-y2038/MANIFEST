@@ -11,6 +11,7 @@ MANIFEST.SKIP
 META.yml
 munge_config
 t/everywhere.t
+t/localtimetz.t
 t/time.t
 t/timegm.t
 typemap

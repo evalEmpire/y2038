@@ -138,6 +138,7 @@ localtime(...)
             }
         }
 
+	tzset();
         err = localtime64_r(&when, &date);
 
         if( err == NULL )
