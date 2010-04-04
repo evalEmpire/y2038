@@ -5,6 +5,77 @@ use base qw(Module::Build);
 
 use ExtUtils::CBuilder;
 
+# A very conservative set of default limits for the system time.h
+my %Limit_Defaults = (
+    gmtime      => {
+        max =>  2147483647,
+        min =>  0,
+    },
+
+    localtime => {
+        max => 2147483647,
+        min => 0,
+    },
+
+    mktime => {
+        max => {
+            tm_gmtoff =>  0,
+            tm_hour =>  3,
+            tm_isdst =>  0,
+            tm_mday =>  19,
+            tm_min =>  14,
+            tm_mon =>  0,
+            tm_sec =>  7,
+            tm_wday =>  2,
+            tm_yday =>  18,
+            tm_year =>  138,
+            tm_zone =>  "UTC",
+        },
+        min => {
+            tm_gmtoff =>  0,
+            tm_hour =>  0,
+            tm_isdst =>  0,
+            tm_mday =>  1,
+            tm_min =>  0,
+            tm_mon =>  0,
+            tm_sec =>  0,
+            tm_wday =>  4,
+            tm_yday =>  0,
+            tm_year =>  70,
+            tm_zone =>  "UTC",
+        },
+    },
+    timegm => {
+        max => {
+            tm_gmtoff =>  0,
+            tm_hour =>  3,
+            tm_isdst =>  0,
+            tm_mday =>  19,
+            tm_min =>  14,
+            tm_mon =>  0,
+            tm_sec =>  7,
+            tm_wday =>  2,
+            tm_yday =>  18,
+            tm_year =>  138,
+            tm_zone =>  "UTC",
+        },
+
+        min => {
+            tm_gmtoff =>  0,
+            tm_hour =>  0,
+            tm_isdst =>  0,
+            tm_mday =>  1,
+            tm_min =>  0,
+            tm_mon =>  0,
+            tm_sec =>  0,
+            tm_wday =>  4,
+            tm_yday =>  0,
+            tm_year =>  70,
+            tm_zone =>  "UTC",
+        }
+    }
+);
+
 sub is_osx_106 {
     return 0 unless $^O eq 'darwin';
     my $version = `sw_vers -productVersion`;
@@ -126,11 +197,23 @@ sub note_time_limits {
     warn "  and running it...\n";
 
     require JSON;
-    my $json = `./$exe`;
-    $json =~ s{^\#.*\n}{}gm;
-    my $limits = JSON::from_json($json);
 
+    my $limits;
+    my $json = run_in_alarm( 2, sub {
+        return `./$exe`;
+    }, sub {
+        warn "  time limit check timed out, using defaults";
+        return;
+    });
     warn "  Done.\n";
+
+    if( $json ) {
+        $json =~ s{^\#.*\n}{}gm;
+        $limits = JSON::from_json($json);
+    }
+    else {
+        $limits = \%Limit_Defaults;
+    }
 
     my %config;
     for my $key (qw(gmtime localtime)) {
@@ -173,6 +256,26 @@ sub note_time_limits {
     }
 
     return;
+}
+
+
+sub run_in_alarm {
+    my($timeout, $try, $catch) = @_;
+
+    my(@ret, $ret);
+    my $pass = eval {
+        local $SIG{ALRM} = sub { die "alarm\n" };
+        alarm $timeout;
+        wantarray ? @ret = $try->() : $ret = $try->();
+        alarm 0;
+        1;
+    };
+
+    return wantarray ? @ret : $ret if $pass;
+
+    return $catch->() if $@ eq "alarm\n";
+
+    die $@;
 }
 
 

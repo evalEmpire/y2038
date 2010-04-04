@@ -1,4 +1,8 @@
 Next
+  Build
+  * Add a timeout to the system time.h limit check for systems that
+    hang when you try times too large. [rt.cpan.org 40764]
+
   Bugs
   * strict compilers, like Sun's cc, would error because we passed
     too many elements to the tm struct.  [rt.cpan.org #55225]
