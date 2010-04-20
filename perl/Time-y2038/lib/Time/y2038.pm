@@ -48,16 +48,16 @@ See L<perlfunc/localtime> for details.
 
     my $time = timegm($sec, $min, $hour, $month_day, $month, $year);
 
-The inverse of C<gmtime()>, takes a date and returns the coorsponding
+The inverse of C<gmtime()>, takes a date and returns the corresponding
 $time (number of seconds since Midnight, January 1st, 1970 GMT).  All
-values are the same as C<gmtime()> so $month is 0..11 (January is 0)
+values are the same as C<gmtime()>, so $month is 0..11 (January is 0)
 and the $year is years since 1900 (2008 is 108).
 
     # June 4, 1906 03:02:01 GMT
     my $time = timegm(1, 2, 3, 4, 5, 6);
 
-timegm() can take two additional arguments which are always ignored.
-This lets you feed the results from gmtime() back into timegm()
+C<timegm()> can take two additional arguments which are always ignored.
+This lets you feed the results from C<gmtime()> back into C<timegm()>
 without having to strip the arguments off.
 
 The following is always true:
@@ -95,8 +95,7 @@ The safe range of times is +/ 2**52 (about 142 million years).
 
 Although the underlying time library can handle times from -2**63 to
 2**63-1 (about +/- 292 billion years) Perl uses floating point numbers
-internally and so accuracy degrates after 2**52.
-
+internally, so accuracy degrates after 2**52.
 
 =head1 BUGS & FEEDBACK
 
@@ -107,9 +106,7 @@ If you like the module, please drop the author an email.
 
 The latest version of this module can be found at
 F<http://y2038.googlecode.com/> and the repository is at
-F<http://y2038.googlecode.com/svn/trunk/> in F<perl/Time-y2038>.  You
-have to check out the whole repository because there are symlinks.
-
+F<http://github.com/schwern/y2038>.
 
 =head1 AUTHOR
 
@@ -124,7 +121,6 @@ This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
 See F<http://www.perl.com/perl/misc/Artistic.html>
-
 
 =head1 SEE ALSO
 
