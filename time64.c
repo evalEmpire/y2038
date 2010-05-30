@@ -515,7 +515,7 @@ static Time64_T seconds_between_years(Year left_year, Year right_year) {
 }
 
 
-Time64_T mktime64(const struct TM *input_date) {
+Time64_T mktime64(struct TM *input_date) {
     struct tm safe_date;
     struct TM date;
     Time64_T  time;
@@ -524,7 +524,11 @@ Time64_T mktime64(const struct TM *input_date) {
     if( date_in_safe_range(input_date, &SYSTEM_MKTIME_MIN, &SYSTEM_MKTIME_MAX) )
     {
         copy_TM64_to_tm(input_date, &safe_date);
-        return (Time64_T)mktime(&safe_date);
+        time = (Time64_T)mktime(&safe_date);
+
+        /* Correct the possibly out of bound input date */
+        copy_tm_to_TM64(&safe_date, input_date);
+        return time;
     }
 
     /* Have to make the year safe in date else it won't fit in safe_date */
@@ -534,6 +538,9 @@ Time64_T mktime64(const struct TM *input_date) {
 
     time = (Time64_T)mktime(&safe_date);
 
+    /* Correct the user's possibly out of bound input date */
+    copy_tm_to_TM64(&safe_date, input_date);
+
     time += seconds_between_years(year, (Year)(safe_date.tm_year + 1900));
 
     return time;
@@ -541,7 +548,7 @@ Time64_T mktime64(const struct TM *input_date) {
 
 
 /* Because I think mktime() is a crappy name */
-Time64_T timelocal64(const struct TM *date) {
+Time64_T timelocal64(struct TM *date) {
     return mktime64(date);
 }
 

@@ -53,8 +53,8 @@ char *ctime64            (const Time64_T*);
 char *ctime64_r          (const Time64_T*, char*);
 
 Time64_T   timegm64      (const struct TM *);
-Time64_T   mktime64      (const struct TM *);
-Time64_T   timelocal64   (const struct TM *);
+Time64_T   mktime64      (struct TM *);
+Time64_T   timelocal64   (struct TM *);
 
 
 /* Not everyone has gm/localtime_r(), provide a replacement */
