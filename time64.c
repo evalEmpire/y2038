@@ -54,12 +54,12 @@ gmtime64_r() is a 64-bit equivalent of gmtime_r().
 static struct TM   Static_Return_Date;
 static char        Static_Return_String[35];
 
-static const int days_in_month[2][12] = {
+static const char days_in_month[2][12] = {
     {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
     {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
 };
 
-static const int julian_days_by_month[2][12] = {
+static const short julian_days_by_month[2][12] = {
     {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334},
     {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335},
 };
@@ -73,7 +73,7 @@ static char mon_name[12][4] = {
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
-static const int length_of_year[2] = { 365, 366 };
+static const short length_of_year[2] = { 365, 366 };
 
 /* Some numbers relating to the gregorian cycle */
 static const Year     years_in_gregorian_cycle   = 400;
@@ -88,7 +88,7 @@ static const Time64_T seconds_in_gregorian_cycle = days_in_gregorian_cycle * 60L
 #define SOLAR_CYCLE_LENGTH 28
 
 /* Year cycle from MAX_SAFE_YEAR down. */
-static const int safe_years_high[SOLAR_CYCLE_LENGTH] = {
+static const short safe_years_high[SOLAR_CYCLE_LENGTH] = {
     2016, 2017, 2018, 2019,
     2020, 2021, 2022, 2023,
     2024, 2025, 2026, 2027,
@@ -110,7 +110,7 @@ static const int safe_years_low[SOLAR_CYCLE_LENGTH] = {
 };
 
 /* This isn't used, but it's handy to look at */
-static const int dow_year_start[SOLAR_CYCLE_LENGTH] = {
+static const char dow_year_start[SOLAR_CYCLE_LENGTH] = {
     5, 0, 1, 2,     /* 0       2016 - 2019 */
     3, 5, 6, 0,     /* 4  */
     1, 3, 4, 5,     /* 8       1996 - 1998, 1971*/
