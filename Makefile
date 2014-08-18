@@ -8,7 +8,7 @@ TIME64_OBJECTS = time64.o
 
 all : bin/check_max
 
-bin/check_max : $(TIME64_OBJECTS) time64_config.h
+bin/check_max : $(TIME64_OBJECTS)
 
 time64.o : time64_config.h time64_limits.h time64.h Makefile
 
@@ -33,8 +33,8 @@ BLACKBOX_TESTS = 	t/year_limit.t	\
 GLASSBOX_TESTS = 	t/safe_year.t	\
 			t/seconds_between_years.t
 
-$(BLACKBOX_TESTS) : t/tap.c t/tap.h $(TIME64_OBJECTS)
-$(GLASSBOX_TESTS) : t/tap.c t/tap.h
+$(BLACKBOX_TESTS) : t/tap.c $(TIME64_OBJECTS)
+$(GLASSBOX_TESTS) : t/tap.c
 
 test : tap_tests localtime_tests
 
