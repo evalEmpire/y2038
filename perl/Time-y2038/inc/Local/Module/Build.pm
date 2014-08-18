@@ -199,10 +199,14 @@ sub note_time_limits {
     require JSON;
 
     my $limits;
+    my $pid;
     my $json = run_in_alarm( 2, sub {
-        return `./$exe`;
+        $pid = open(CHECK_MAX, "-|", "./$exe");
+        local $/;
+        return <CHECK_MAX>;
     }, sub {
         warn "  time limit check timed out, using defaults";
+        kill "INT", $pid;
         return;
     });
     warn "  Done.\n";
