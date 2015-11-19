@@ -35,6 +35,13 @@ my $build = Local::Module::Build->new(
     requires            => {
         perl                    => '5.6.1'
     },
+
+    meta_merge => {
+        resources => {
+            bugtracker => 'https://github.com/evalEmpire/y2038/issues',
+            repository  => 'https://github.com/evalEmpire/y2038',
+        },
+    }
 );
 
 $build->create_build_script;

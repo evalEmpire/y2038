@@ -99,14 +99,14 @@ internally, so accuracy degrates after 2**52.
 
 =head1 BUGS & FEEDBACK
 
-See F<http://rt.cpan.org/Dist/Display.html?Queue=Time-y2038> to report
+See F<https://github.com/evalEmpire/y2038/issues/new> to report
 and view bugs.
 
 If you like the module, please drop the author an email.
 
 The latest version of this module can be found at
-F<http://y2038.googlecode.com/> and the repository is at
-F<http://github.com/schwern/y2038>.
+F<http://metacpan.org/pod/Time::y2038> and the repository is at
+F<https://github.com/evalEmpire/y2038>.
 
 =head1 AUTHOR
 
@@ -125,8 +125,6 @@ See F<http://www.perl.com/perl/misc/Artistic.html>
 =head1 SEE ALSO
 
 L<Time::y2038::Everywhere> overrides localtime() and gmtime() across the whole program.
-
-The y2038 project at F<http://y2038.googlecode.com/>
 
 L<http://xkcd.com/376/>
 

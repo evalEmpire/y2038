@@ -1,9 +1,9 @@
 This is the Time::y2038 Perl module.  It is a wrapper around the y2038
 C library to use its functions from Perl.  The latest version and
-project information can be had from: http://y2038.googlecode.com/
+project information can be had from: https://github.com/evalEmpire/y2038
 
 Run "perldoc Time::y2038" for documentation (before or after installing) or
-see http://search.cpan.org/perldoc?Time::y2038.
+see http://metacpan.org/pod/Time::y2038.
 
 
 SIMPLE INSTALL
@@ -66,7 +66,7 @@ PROBLEMS
 --------
 
 If you encounter any problems building or testing this module, please
-report it at http://rt.cpan.org/Dist/Display.html?Queue=Time-y2038
+report it at https://github.com/evalEmpire/y2038/issues/new
 
 Please include the complete output of your build.  Don't cut things
 out to save me trouble, you never know what's important.  Also include
