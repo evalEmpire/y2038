@@ -6,10 +6,11 @@ INCLUDE  = -I.
 DEBUG    = -DTIME_64_DEBUG
 CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 TIME64_OBJECTS = time64.o
+CHECK_MAX_BIN=bin/check_max
 
-all : bin/check_max
+all : $(CHECK_MAX_BIN)
 
-bin/check_max : $(TIME64_OBJECTS)
+$(CHECK_MAX_BIN) : $(TIME64_OBJECTS)
 
 time64.o : time64_config.h time64_limits.h time64.h Makefile
 
@@ -63,6 +64,7 @@ clean:
 		t/*_test.out.bz2	\
 		t/bench			\
 		t/bench_system		\
+		$(CHECK_MAX_BIN)	\
 		*.o
 	-rm -rf	t/*.dSYM/		\
 		bin/*.dSYM/		\
