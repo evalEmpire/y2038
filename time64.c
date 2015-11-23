@@ -234,19 +234,19 @@ Time64_T timegm64(const struct TM *date) {
     Time64_T seconds = 0;
     Year     year;
     Year     orig_year = (Year)date->tm_year;
-    int      cycles  = 0;
+    Year     cycles  = 0;
 
     if( orig_year > 100 ) {
         cycles = (orig_year - 100) / 400;
         orig_year -= cycles * 400;
-        days      += (Time64_T)cycles * days_in_gregorian_cycle;
+        days      += cycles * days_in_gregorian_cycle;
     }
     else if( orig_year < -300 ) {
         cycles = (orig_year - 100) / 400;
         orig_year -= cycles * 400;
-        days      += (Time64_T)cycles * days_in_gregorian_cycle;
+        days      += cycles * days_in_gregorian_cycle;
     }
-    TIME64_TRACE3("# timegm/ cycles: %d, days: %lld, orig_year: %lld\n", cycles, days, orig_year);
+    TIME64_TRACE3("# timegm/ cycles: %lld, days: %lld, orig_year: %lld\n", cycles, days, orig_year);
 
     if( orig_year > 70 ) {
         year = 70;
@@ -496,7 +496,7 @@ struct tm * fake_gmtime_r(const time_t *time, struct tm *result) {
 static Time64_T seconds_between_years(Year left_year, Year right_year) {
     int increment = (left_year > right_year) ? 1 : -1;
     Time64_T seconds = 0;
-    int cycles;
+    Year cycles;
 
     if( left_year > 2400 ) {
         cycles = (left_year - 2400) / 400;
@@ -564,7 +564,7 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
     Time64_T m;
     Time64_T time = *in_time;
     Year year = 70;
-    int cycles = 0;
+    Year cycles = 0;
 
     assert(p != NULL);
 
@@ -613,10 +613,10 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
 
     if (m >= 0) {
         /* Gregorian cycles, this is huge optimization for distant times */
-        cycles = (int)(m / (Time64_T) days_in_gregorian_cycle);
+        cycles = m / (Time64_T) days_in_gregorian_cycle;
         if( cycles ) {
-            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
-            year += (cycles * years_in_gregorian_cycle);
+            m -= cycles * (Time64_T) days_in_gregorian_cycle;
+            year += cycles * years_in_gregorian_cycle;
         }
 
         /* Years */
@@ -637,10 +637,10 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
         year--;
 
         /* Gregorian cycles */
-        cycles = (int)((m / (Time64_T) days_in_gregorian_cycle) + 1);
+        cycles = (m / (Time64_T) days_in_gregorian_cycle) + 1;
         if( cycles ) {
-            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
-            year += (cycles * years_in_gregorian_cycle);
+            m -= cycles * (Time64_T) days_in_gregorian_cycle;
+            year += cycles * years_in_gregorian_cycle;
         }
 
         /* Years */
