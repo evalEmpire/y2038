@@ -1,3 +1,6 @@
+
+.DELETE_ON_ERROR:
+
 .PHONY : test bench clean tap_tests localtime_tests
 
 OPTIMIZE = -g
