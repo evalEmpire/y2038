@@ -280,7 +280,10 @@ static int check_tm(struct TM *tm)
 {
     /* Don't forget leap seconds */
     assert(tm->tm_sec >= 0);
-    assert(tm->tm_sec <= 61);
+
+    /* Allow for just one positive leap second, which is what the C99 standard says. */
+    /* Two leap seconds in the same minute are not allowed (the C90 range 0..61 was a defect). */
+    assert(tm->tm_sec <= 60);
 
     assert(tm->tm_min >= 0);
     assert(tm->tm_min <= 59);
