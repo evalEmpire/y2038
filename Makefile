@@ -55,7 +55,7 @@ tap_tests: $(BLACKBOX_TESTS) $(GLASSBOX_TESTS)
 	@prove --exec '' t/*.t
 
 clean:
-	-rm 	t/*.t 			\
+	-rm -f 	t/*.t 			\
 	   	t/localtime_test	\
 		t/gmtime_test		\
 		t/*_test.out.bz2	\
