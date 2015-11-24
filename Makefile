@@ -4,7 +4,7 @@
 .PHONY : test bench clean tap_tests localtime_tests
 
 OPTIMIZE = -g
-WARNINGS = -W -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion -Wcast-qual -Wwrite-strings
+WARNINGS = -W -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion -Wcast-qual -Wwrite-strings -Wmissing-prototypes -Wc++-compat
 INCLUDE  = -I.
 # Under Linux/glibc you will need flag _BSD_SOURCE for names tm_gmtoff and tm_zone (instead of __tm_gmtoff and __tm_zone) in struct tm,
 # and flag _POSIX_SOURCE (there are alternatives) for tzset().
