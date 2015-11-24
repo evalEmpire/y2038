@@ -179,7 +179,7 @@ static int is_exception_century(Year year)
    The result is like cmp.
    Ignores things like gmtoffset and dst
 */
-int cmp_date( const struct TM* left, const struct tm* right ) {
+static int cmp_date( const struct TM* left, const struct tm* right ) {
     if( left->tm_year > right->tm_year )
         return 1;
     else if( left->tm_year < right->tm_year )
@@ -217,7 +217,7 @@ int cmp_date( const struct TM* left, const struct tm* right ) {
 /* Check if a date is safely inside a range.
    The intention is to check if its a few days inside.
 */
-int date_in_safe_range( const struct TM* date, const struct tm* min, const struct tm* max ) {
+static int date_in_safe_range( const struct TM* date, const struct tm* min, const struct tm* max ) {
     if( cmp_date(date, min) == -1 )
         return 0;
 
@@ -398,7 +398,7 @@ static int safe_year(const Year year)
 }
 
 
-void copy_tm_to_TM64(const struct tm *src, struct TM *dest) {
+static void copy_tm_to_TM64(const struct tm *src, struct TM *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -430,7 +430,7 @@ void copy_tm_to_TM64(const struct tm *src, struct TM *dest) {
 }
 
 
-void copy_TM64_to_tm(const struct TM *src, struct tm *dest) {
+static void copy_TM64_to_tm(const struct TM *src, struct tm *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -463,6 +463,8 @@ void copy_TM64_to_tm(const struct TM *src, struct tm *dest) {
 
 
 /* Simulate localtime_r() to the best of our ability */
+#ifndef HAS_LOCALTIME_R
+
 struct tm * fake_localtime_r(const time_t *time, struct tm *result) {
     const struct tm *static_result = localtime(time);
 
@@ -478,8 +480,12 @@ struct tm * fake_localtime_r(const time_t *time, struct tm *result) {
     }
 }
 
+#endif  /* #ifndef HAS_LOCALTIME_R */
+
 
 /* Simulate gmtime_r() to the best of our ability */
+#ifndef HAS_GMTIME_R
+
 struct tm * fake_gmtime_r(const time_t *time, struct tm *result) {
     const struct tm *static_result = gmtime(time);
 
@@ -494,6 +500,8 @@ struct tm * fake_gmtime_r(const time_t *time, struct tm *result) {
         return result;
     }
 }
+
+#endif  /* #ifndef HAS_GMTIME_R */
 
 
 static Time64_T seconds_between_years(Year left_year, Year right_year) {
@@ -786,14 +794,14 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
 }
 
 
-int valid_tm_wday( const struct TM* date ) {
+static int valid_tm_wday( const struct TM* date ) {
     if( 0 <= date->tm_wday && date->tm_wday <= 6 )
         return 1;
     else
         return 0;
 }
 
-int valid_tm_mon( const struct TM* date ) {
+static int valid_tm_mon( const struct TM* date ) {
     if( 0 <= date->tm_mon && date->tm_mon <= 11 )
         return 1;
     else
