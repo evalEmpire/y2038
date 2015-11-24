@@ -4,6 +4,8 @@
    Sensible defaults provided.
 */
 
+#include <stdint.h>   /* If your system does not have stdint.h or does not define int64_t, you can use 'long long' instead, */
+                      /* but then make sure that 'long long' is indeed a 64-bit signed integer on your platform. */
 
 #ifndef TIME64_CONFIG_H
 #    define TIME64_CONFIG_H
@@ -19,7 +21,7 @@
    A 64 bit integer type to use to store time and others.
    Must be defined.
 */
-#define INT_64_T                long long
+#define INT_64_T                int64_t
 
 
 /* USE_TM64
