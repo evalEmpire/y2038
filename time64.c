@@ -130,7 +130,9 @@ static const char dow_year_start[SOLAR_CYCLE_LENGTH] = {
 
 /* IS_LEAP is used all over the place to index on arrays, so make sure it always returns 0 or 1. */
 #define IS_LEAP(n)      ( (!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) ? 1 : 0 )
-#define WRAP(a,b,m)     ((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
+
+/* Allegedly, some <termios.h> define a macro called WRAP, so use a longer name like WRAP_TIME64. */
+#define WRAP_TIME64(a,b,m)     ((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
 
 #ifdef USE_SYSTEM_LOCALTIME
 #    define SHOULD_USE_SYSTEM_LOCALTIME(a)  (       \
@@ -598,9 +600,9 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
     time /= 24;
     v_tm_tday = time;
 
-    WRAP (v_tm_sec, v_tm_min, 60);
-    WRAP (v_tm_min, v_tm_hour, 60);
-    WRAP (v_tm_hour, v_tm_tday, 24);
+    WRAP_TIME64 (v_tm_sec, v_tm_min, 60);
+    WRAP_TIME64 (v_tm_min, v_tm_hour, 60);
+    WRAP_TIME64 (v_tm_hour, v_tm_tday, 24);
 
     v_tm_wday = (int)((v_tm_tday + 4) % 7);
     if (v_tm_wday < 0)
