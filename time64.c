@@ -660,7 +660,12 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
         m += (Time64_T) days_in_month[leap][v_tm_mon];
     }
 
-    p->tm_year = year;
+#   ifdef USE_TM64
+      p->tm_year = year;
+#   else
+      p->tm_year = (int)year;
+#   endif
+
     if( p->tm_year != year ) {
 #ifdef EOVERFLOW
         errno = EOVERFLOW;
@@ -730,7 +735,12 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
 
     copy_tm_to_TM64(&safe_date, local_tm);
 
-    local_tm->tm_year = orig_year;
+#   ifdef USE_TM64
+      local_tm->tm_year = orig_year;
+#   else
+      local_tm->tm_year = (int)orig_year;
+#   endif
+
     if( local_tm->tm_year != orig_year ) {
         TIME64_TRACE2("tm_year overflow: tm_year %lld, orig_year %lld\n",
               (Year)local_tm->tm_year, (Year)orig_year);
