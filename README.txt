@@ -60,8 +60,4 @@ Portability
 I would like to add some configuration detection stuff in the future, but
 for now all I can do is document the assumptions...
 
-This code assumes that long longs are 64 bit integers which is technically
-in violation of the C standard.  This can be changed in time64.h by
-changing the Time64_T and Int64 typedefs.
-
 There are a number of configuration options in time64.h.
