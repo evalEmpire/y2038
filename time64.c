@@ -128,8 +128,11 @@ static const char dow_year_start[SOLAR_CYCLE_LENGTH] = {
 #define CHEAT_DAYS  (1199145600 / 24 / 60 / 60)
 #define CHEAT_YEARS 108
 
-#define IS_LEAP(n)      ((!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) != 0)
-#define WRAP(a,b,m)     ((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
+/* IS_LEAP is used all over the place to index on arrays, so make sure it always returns 0 or 1. */
+#define IS_LEAP(n)      ( (!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) ? 1 : 0 )
+
+/* Allegedly, some <termios.h> define a macro called WRAP, so use a longer name like WRAP_TIME64. */
+#define WRAP_TIME64(a,b,m)     ((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
 
 #ifdef USE_SYSTEM_LOCALTIME
 #    define SHOULD_USE_SYSTEM_LOCALTIME(a)  (       \
@@ -176,7 +179,7 @@ static int is_exception_century(Year year)
    The result is like cmp.
    Ignores things like gmtoffset and dst
 */
-int cmp_date( const struct TM* left, const struct tm* right ) {
+static int cmp_date( const struct TM* left, const struct tm* right ) {
     if( left->tm_year > right->tm_year )
         return 1;
     else if( left->tm_year < right->tm_year )
@@ -214,7 +217,7 @@ int cmp_date( const struct TM* left, const struct tm* right ) {
 /* Check if a date is safely inside a range.
    The intention is to check if its a few days inside.
 */
-int date_in_safe_range( const struct TM* date, const struct tm* min, const struct tm* max ) {
+static int date_in_safe_range( const struct TM* date, const struct tm* min, const struct tm* max ) {
     if( cmp_date(date, min) == -1 )
         return 0;
 
@@ -234,19 +237,19 @@ Time64_T timegm64(const struct TM *date) {
     Time64_T seconds = 0;
     Year     year;
     Year     orig_year = (Year)date->tm_year;
-    int      cycles  = 0;
+    Year     cycles  = 0;
 
     if( orig_year > 100 ) {
         cycles = (orig_year - 100) / 400;
         orig_year -= cycles * 400;
-        days      += (Time64_T)cycles * days_in_gregorian_cycle;
+        days      += cycles * days_in_gregorian_cycle;
     }
     else if( orig_year < -300 ) {
         cycles = (orig_year - 100) / 400;
         orig_year -= cycles * 400;
-        days      += (Time64_T)cycles * days_in_gregorian_cycle;
+        days      += cycles * days_in_gregorian_cycle;
     }
-    TIME64_TRACE3("# timegm/ cycles: %d, days: %lld, orig_year: %lld\n", cycles, days, orig_year);
+    TIME64_TRACE3("# timegm/ cycles: %lld, days: %lld, orig_year: %lld\n", cycles, days, orig_year);
 
     if( orig_year > 70 ) {
         year = 70;
@@ -280,7 +283,10 @@ static int check_tm(struct TM *tm)
 {
     /* Don't forget leap seconds */
     assert(tm->tm_sec >= 0);
-    assert(tm->tm_sec <= 61);
+
+    /* Allow for just one positive leap second, which is what the C99 standard says. */
+    /* Two leap seconds in the same minute are not allowed (the C90 range 0..61 was a defect). */
+    assert(tm->tm_sec <= 60);
 
     assert(tm->tm_min >= 0);
     assert(tm->tm_min <= 59);
@@ -392,7 +398,7 @@ static int safe_year(const Year year)
 }
 
 
-void copy_tm_to_TM64(const struct tm *src, struct TM *dest) {
+static void copy_tm_to_TM64(const struct tm *src, struct TM *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -424,7 +430,7 @@ void copy_tm_to_TM64(const struct tm *src, struct TM *dest) {
 }
 
 
-void copy_TM64_to_tm(const struct TM *src, struct tm *dest) {
+static void copy_TM64_to_tm(const struct TM *src, struct tm *dest) {
     if( src == NULL ) {
         memset(dest, 0, sizeof(*dest));
     }
@@ -457,6 +463,8 @@ void copy_TM64_to_tm(const struct TM *src, struct tm *dest) {
 
 
 /* Simulate localtime_r() to the best of our ability */
+#ifndef HAS_LOCALTIME_R
+
 struct tm * fake_localtime_r(const time_t *time, struct tm *result) {
     const struct tm *static_result = localtime(time);
 
@@ -472,8 +480,12 @@ struct tm * fake_localtime_r(const time_t *time, struct tm *result) {
     }
 }
 
+#endif  /* #ifndef HAS_LOCALTIME_R */
+
 
 /* Simulate gmtime_r() to the best of our ability */
+#ifndef HAS_GMTIME_R
+
 struct tm * fake_gmtime_r(const time_t *time, struct tm *result) {
     const struct tm *static_result = gmtime(time);
 
@@ -489,11 +501,13 @@ struct tm * fake_gmtime_r(const time_t *time, struct tm *result) {
     }
 }
 
+#endif  /* #ifndef HAS_GMTIME_R */
+
 
 static Time64_T seconds_between_years(Year left_year, Year right_year) {
     int increment = (left_year > right_year) ? 1 : -1;
     Time64_T seconds = 0;
-    int cycles;
+    Year cycles;
 
     if( left_year > 2400 ) {
         cycles = (left_year - 2400) / 400;
@@ -561,7 +575,7 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
     Time64_T m;
     Time64_T time = *in_time;
     Year year = 70;
-    int cycles = 0;
+    Year cycles = 0;
 
     assert(p != NULL);
 
@@ -594,9 +608,9 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
     time /= 24;
     v_tm_tday = time;
 
-    WRAP (v_tm_sec, v_tm_min, 60);
-    WRAP (v_tm_min, v_tm_hour, 60);
-    WRAP (v_tm_hour, v_tm_tday, 24);
+    WRAP_TIME64 (v_tm_sec, v_tm_min, 60);
+    WRAP_TIME64 (v_tm_min, v_tm_hour, 60);
+    WRAP_TIME64 (v_tm_hour, v_tm_tday, 24);
 
     v_tm_wday = (int)((v_tm_tday + 4) % 7);
     if (v_tm_wday < 0)
@@ -610,10 +624,10 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
 
     if (m >= 0) {
         /* Gregorian cycles, this is huge optimization for distant times */
-        cycles = (int)(m / (Time64_T) days_in_gregorian_cycle);
+        cycles = m / (Time64_T) days_in_gregorian_cycle;
         if( cycles ) {
-            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
-            year += (cycles * years_in_gregorian_cycle);
+            m -= cycles * (Time64_T) days_in_gregorian_cycle;
+            year += cycles * years_in_gregorian_cycle;
         }
 
         /* Years */
@@ -634,10 +648,10 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
         year--;
 
         /* Gregorian cycles */
-        cycles = (int)((m / (Time64_T) days_in_gregorian_cycle) + 1);
+        cycles = (m / (Time64_T) days_in_gregorian_cycle) + 1;
         if( cycles ) {
-            m -= (cycles * (Time64_T) days_in_gregorian_cycle);
-            year += (cycles * years_in_gregorian_cycle);
+            m -= cycles * (Time64_T) days_in_gregorian_cycle;
+            year += cycles * years_in_gregorian_cycle;
         }
 
         /* Years */
@@ -657,7 +671,12 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
         m += (Time64_T) days_in_month[leap][v_tm_mon];
     }
 
-    p->tm_year = year;
+#   ifdef USE_TM64
+      p->tm_year = year;
+#   else
+      p->tm_year = (int)year;
+#   endif
+
     if( p->tm_year != year ) {
 #ifdef EOVERFLOW
         errno = EOVERFLOW;
@@ -727,7 +746,12 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
 
     copy_tm_to_TM64(&safe_date, local_tm);
 
-    local_tm->tm_year = orig_year;
+#   ifdef USE_TM64
+      local_tm->tm_year = orig_year;
+#   else
+      local_tm->tm_year = (int)orig_year;
+#   endif
+
     if( local_tm->tm_year != orig_year ) {
         TIME64_TRACE2("tm_year overflow: tm_year %lld, orig_year %lld\n",
               (Year)local_tm->tm_year, (Year)orig_year);
@@ -758,7 +782,7 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
     /* GMT is Jan 1st, xx01 year, but localtime is still Dec 31st 
        in a non-leap xx00.  There is one point in the cycle
        we can't account for which the safe xx00 year is a leap
-       year.  So we need to correct for Dec 31st comming out as
+       year.  So we need to correct for Dec 31st coming out as
        the 366th day of the year.
     */
     if( !IS_LEAP(local_tm->tm_year) && local_tm->tm_yday == 365 )
@@ -770,14 +794,14 @@ struct TM *localtime64_r (const Time64_T *time, struct TM *local_tm)
 }
 
 
-int valid_tm_wday( const struct TM* date ) {
+static int valid_tm_wday( const struct TM* date ) {
     if( 0 <= date->tm_wday && date->tm_wday <= 6 )
         return 1;
     else
         return 0;
 }
 
-int valid_tm_mon( const struct TM* date ) {
+static int valid_tm_mon( const struct TM* date ) {
     if( 0 <= date->tm_mon && date->tm_mon <= 11 )
         return 1;
     else

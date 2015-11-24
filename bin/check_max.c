@@ -15,8 +15,9 @@ time_t Time_Min;
 time_t Time_Zero = 0;
 
 
-char *dump_date(const struct tm *date) {
-    char *dump = malloc(80 * sizeof(char));
+/* Not really used anymore.
+static char *dump_date(const struct tm *date) {
+    char *dump = (char *) malloc(80 * sizeof(char));
     sprintf(
         dump,
         "{ %d, %d, %d, %d, %d, %d }",
@@ -25,15 +26,16 @@ char *dump_date(const struct tm *date) {
 
     return dump;
 }
+*/
 
 
 /* Visual C++ 2008's difftime() can't do negative times */
-double my_difftime(time_t left, time_t right) {
+static double my_difftime(time_t left, time_t right) {
     double diff = (double)left - (double)right;
     return diff;
 }
 
-time_t check_date_max( struct tm * (*date_func)(const time_t *), const char *func_name ) {
+static time_t check_date_max( struct tm * (*date_func)(const time_t *), const char *func_name ) {
     struct tm *date;
     time_t time        = Time_Max;
     time_t good_time   = 0;
@@ -62,7 +64,7 @@ time_t check_date_max( struct tm * (*date_func)(const time_t *), const char *fun
 }
 
 
-time_t check_date_min( struct tm * (*date_func)(const time_t *), const char *func_name ) {
+static time_t check_date_min( struct tm * (*date_func)(const time_t *), const char *func_name ) {
     struct tm *date;
     time_t time        = Time_Min;
     time_t good_time   = 0;
@@ -91,14 +93,14 @@ time_t check_date_min( struct tm * (*date_func)(const time_t *), const char *fun
 }
 
 
-struct tm * check_to_time_max( time_t (*to_time)(struct tm *), const char *func_name,
-                          struct tm * (*to_date)(const time_t *) )
+static struct tm * check_to_time_max( time_t (*to_time)(struct tm *), const char *func_name,
+                                      struct tm * (*to_date)(const time_t *) )
 {
     time_t round_trip;
     time_t time        = Time_Max;
     time_t good_time   = 0;
     struct tm *date;
-    struct tm *good_date = malloc(sizeof(struct tm));
+    struct tm *good_date = (struct tm *) malloc(sizeof(struct tm));
     time_t time_change = Time_Max;
 
     /* Binary search for the exact failure point */
@@ -126,14 +128,14 @@ struct tm * check_to_time_max( time_t (*to_time)(struct tm *), const char *func_
 }
 
 
-struct tm * check_to_time_min( time_t (*to_time)(struct tm *), const char *func_name,
-                          struct tm * (*to_date)(const time_t *) )
+static struct tm * check_to_time_min( time_t (*to_time)(struct tm *), const char *func_name,
+                                      struct tm * (*to_date)(const time_t *) )
 {
     time_t round_trip;
     time_t time        = Time_Min;
     time_t good_time   = 0;
     struct tm *date;
-    struct tm *good_date = malloc(sizeof(struct tm));
+    struct tm *good_date = (struct tm *) malloc(sizeof(struct tm));
     time_t time_change = Time_Min;
 
     /* Binary search for the exact failure point */
@@ -161,7 +163,7 @@ struct tm * check_to_time_min( time_t (*to_time)(struct tm *), const char *func_
 }
 
 
-void guess_time_limits_from_types(void) {
+static void guess_time_limits_from_types(void) {
     if( sizeof(time_t) == 4 ) {
         /* y2038 bug, out to 2**31-1 */
         Time_Max =  2147483647;
@@ -189,8 +191,8 @@ void guess_time_limits_from_types(void) {
 
 
 /* Dump a tm struct as a json fragment */
-char * tm_as_json(const struct tm* date) {
-    char *date_json = malloc(sizeof(char) * 512);
+static char * tm_as_json(const struct tm* date) {
+    char *date_json = (char *) malloc(sizeof(char) * 512);
 #ifdef HAS_TM_TM_ZONE
     char zone_json[32];
 #endif
