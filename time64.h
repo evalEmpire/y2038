@@ -4,6 +4,10 @@
 #include <time.h>
 #include "time64_config.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Set our custom types */
 typedef INT_64_T        Int64;
 typedef Int64           Time64_T;
@@ -77,5 +81,8 @@ Time64_T   timelocal64   (struct TM *);
     #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n"
 #endif
 
+#ifdef __cplusplus
+  };
+#endif
 
 #endif
