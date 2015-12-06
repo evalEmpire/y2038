@@ -3,6 +3,7 @@
 OPTIMIZE = -g
 WARNINGS = -W -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion -Wcast-qual -Wwrite-strings
 INCLUDE  = -I.
+DEBUG    = -DTIME_64_DEBUG
 CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 TIME64_OBJECTS = time64.o
 
@@ -37,6 +38,8 @@ $(BLACKBOX_TESTS) : t/tap.c $(TIME64_OBJECTS)
 $(GLASSBOX_TESTS) : t/tap.c
 
 test : tap_tests localtime_tests
+test_debug: CFLAGS += $(DEBUG)
+test_debug: test
 
 localtime_tests: t/localtime_test t/gmtime_test
 	@which bzdiff > /dev/null || (echo 'You need bzdiff to run these tests'; exit 1)
