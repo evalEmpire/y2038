@@ -1,5 +1,10 @@
+sudo: false
 language: c
+os:
+    - osx
+    - linux
 compiler:
     - clang
     - gcc
-script: make test    
+script:
+    - '[[ $TIME_64_DEBUG > 0 ]] && make test_debug || make test'
