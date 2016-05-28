@@ -11,6 +11,10 @@ DEBUG    = -DTIME_64_DEBUG
 # and flag _POSIX_SOURCE (there are alternatives) for tzset().
 # CPPFLAGS = -D_BSD_SOURCE -D_POSIX_SOURCE
 CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+  CFLAGS += -DHAS_TM_TM_GMTOFF -DHAS_TM_TM_ZONE
+endif
 TIME64_OBJECTS = time64.o
 CHECK_MAX_BIN=bin/check_max
 
