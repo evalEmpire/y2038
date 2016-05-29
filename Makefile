@@ -3,22 +3,31 @@
 
 .PHONY : test bench clean tap_tests localtime_tests
 
-OPTIMIZE = -g
-WARNINGS = -W -Wall -ansi -pedantic -Wno-long-long -Wextra -Wdeclaration-after-statement -Wendif-labels -Wconversion -Wcast-qual -Wwrite-strings -Wmissing-prototypes -Wc++-compat
+OPTIMIZE = -O3 -g
+WARNINGS = -W -Wall -Wextra -ansi -pedantic -Wno-long-long -Wdeclaration-after-statement \
+  -Wendif-labels -Wconversion -Wcast-qual -Wwrite-strings -Wmissing-prototypes \
+  -Wc++-compat
+#clang: -Wno-incompatible-pointer-types-discards-qualifiers
+#gcc:   -Wno-discarded-qualifiers
 INCLUDE  = -I.
-DEBUG    = -DTIME_64_DEBUG
 CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   CFLAGS += -DHAS_TM_TM_GMTOFF -DHAS_TM_TM_ZONE
 endif
 ifeq ($(UNAME_S),Linux)
-  # Under Linux/glibc you will need flag _BSD_SOURCE for names tm_gmtoff and tm_zone (instead of __tm_gmtoff and __tm_zone) in struct tm,
-  # and flag _POSIX_SOURCE (there are alternatives) for tzset().
+  # Under Linux/glibc you will need flag _BSD_SOURCE for names tm_gmtoff and tm_zone
+  # (instead of __tm_gmtoff and __tm_zone) in struct tm,
+  # and _POSIX_SOURCE (there are alternatives) for tzset().
   CFLAGS += -D_BSD_SOURCE -D_POSIX_SOURCE
 endif
+ifneq ($(DEBUG),)
+  CFLAGS  += -DTIME_64_DEBUG
+  OPTIMIZE = -g
+endif
+
 TIME64_OBJECTS = time64.o
-CHECK_MAX_BIN=bin/check_max
+CHECK_MAX_BIN  = bin/check_max
 
 all : $(CHECK_MAX_BIN)
 
@@ -34,7 +43,6 @@ bench : t/bench t/bench_system
 	time t/bench
 
 t/bench t/bench_system : $(TIME64_OBJECTS)
-
 t/localtime_test : $(TIME64_OBJECTS)
 t/gmtime_test : $(TIME64_OBJECTS)
 

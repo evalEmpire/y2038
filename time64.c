@@ -597,7 +597,6 @@ struct TM *gmtime64_r (const Time64_T *in_time, struct TM *p)
     p->tm_gmtoff = 0;
 #endif
     p->tm_isdst  = 0;
-
 #ifdef HAS_TM_TM_ZONE
     p->tm_zone   = "UTC";
 #endif
