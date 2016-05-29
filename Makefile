@@ -25,6 +25,10 @@ ifneq ($(DEBUG),)
   CFLAGS  += -DTIME_64_DEBUG
   OPTIMIZE = -g
 endif
+# use 64bit but incompatible struct tm
+ifeq ($(USE_TM64),1)
+  CFLAGS  += -DUSE_TM64
+endif
 
 TIME64_OBJECTS = time64.o
 CHECK_MAX_BIN  = bin/check_max
