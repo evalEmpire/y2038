@@ -5,8 +5,9 @@
 #include <time.h>
 #include "time64.h"
 
-int Test_Count = 0;
+#include "tap.h"
 
+int Test_Count = 0;
 
 int diag(const char *message, ...) {
     va_list args;
@@ -29,6 +30,7 @@ void skip_all(const char *reason) {
 
 
 int do_test(const int test, const char *message, va_list args) {
+
     Test_Count++;
 
     printf("%s %d ", (test ? "ok" : "not ok"), Test_Count);
