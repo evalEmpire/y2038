@@ -40,7 +40,6 @@ int do_test(const int test, const char *message, va_list args) {
 
     if( !test ) {
         diag("Failed test");
-        diag(message, args);
     }
 
     return test;
@@ -87,8 +86,7 @@ int is_str(const char* have, const char* want, const char *message, ...) {
     do_test( test, message, args );
 
     if( !test ) {
-        diag("have: %s", have);
-        diag("want: %s", want);
+      diag("have: %s, want: %s", have, want);
     }
 
     va_end(args);
@@ -106,8 +104,7 @@ int is_Int64(const Int64 have, const Int64 want, const char *name, ...) {
     do_test( test, name, args );
 
     if( !test ) {
-        diag("have: %"PRId64, have);
-        diag("want: %"PRId64, want);
+        diag("have: %"PRId64" want: %"PRId64" diff: %"PRId64, have, want, have-want);
     }
 
     va_end(args);

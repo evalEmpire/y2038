@@ -80,7 +80,7 @@ static const Year     years_in_gregorian_cycle   = 400;
 #define               days_in_gregorian_cycle      ((365 * 400) + 100 - 4 + 1)
 static const Time64_T seconds_in_gregorian_cycle = days_in_gregorian_cycle * 60LL * 60LL * 24LL;
 
-/* Year range we can trust the time funcitons with */
+/* Year range we can trust the time functions with */
 #define MAX_SAFE_YEAR 2037
 #define MIN_SAFE_YEAR 1971
 
@@ -131,7 +131,8 @@ static const char dow_year_start[SOLAR_CYCLE_LENGTH] = {
 #define CHEAT_YEARS 108
 
 /* IS_LEAP is used all over the place to index on arrays, so make sure it always returns 0 or 1. */
-#define IS_LEAP(n)      ( (!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) ? 1 : 0 )
+#define IS_LEAP(n)  ( (!(((n) + 1900) % 400) || (!(((n) + 1900) % 4) && (((n) + 1900) % 100))) ? 1 : 0 )
+#define IS_LEAP_ABS(n)  (!((n) % 400) || (!((n) % 4) && ((n) % 100) && ((n) > 0)))
 
 /* Allegedly, some <termios.h> define a macro called WRAP, so use a longer name like WRAP_TIME64. */
 #define WRAP_TIME64(a,b,m)     ((a) = ((a) <  0  ) ? ((b)--, (a) + (m)) : (a))
@@ -512,22 +513,35 @@ static Time64_T seconds_between_years(Year left_year, Year right_year) {
     Year cycles;
 
     if( left_year > 2400 ) {
+        TIME64_TRACE1("year %"PRId64" > 2400\n", left_year);
         cycles = (left_year - 2400) / 400;
         left_year -= cycles * 400;
         seconds   += cycles * seconds_in_gregorian_cycle;
     }
     else if( left_year < 1600 ) {
+        TIME64_TRACE1("year %"PRId64" < 1600\n", left_year);
         cycles = (left_year - 1600) / 400;
         left_year += cycles * 400;
         seconds   += cycles * seconds_in_gregorian_cycle;
     }
 
-    while( left_year != right_year ) {
-        seconds += length_of_year[IS_LEAP(right_year - 1900)] * 60 * 60 * 24;
-        right_year += increment;
+    if (increment > 0) {
+        TIME64_TRACE2("year %"PRId64" > safe_year %"PRId64"\n", left_year, right_year);
+        while( left_year != right_year ) {
+            seconds += length_of_year[IS_LEAP_ABS(right_year)] * 60 * 60 * 24;
+            right_year++;
+        }
+        TIME64_TRACE1("adjust by %"PRId64" days\n", seconds / (60 * 60 * 24));
+        return seconds;
+    } else {
+        TIME64_TRACE2("year %"PRId64" < safe_year %"PRId64"\n", left_year, right_year);
+        while( left_year != right_year ) {
+            seconds -= length_of_year[IS_LEAP_ABS(right_year)] * 60 * 60 * 24;
+            right_year--;
+        }
+        TIME64_TRACE1("adjust by %"PRId64" days\n", seconds / (60 * 60 * 24));
+        return seconds;
     }
-
-    return seconds * increment;
 }
 
 
@@ -544,6 +558,7 @@ Time64_T mktime64(struct TM *input_date) {
 
         /* Correct the possibly out of bound input date */
         copy_tm_to_TM64(&safe_date, input_date);
+        TIME64_TRACE2("mktime64: safe year %ld, %"PRId64" seconds\n", (long)year, time);
         return time;
     }
 
@@ -553,11 +568,13 @@ Time64_T mktime64(struct TM *input_date) {
 
     copy_TM64_to_tm(&date, &safe_date);
     time = (Time64_T)mktime(&safe_date);
+    TIME64_TRACE1("mktime64: %"PRId64" seconds\n", time);
 
     /* Correct the user's possibly out of bound input date */
     copy_tm_to_TM64(&safe_date, input_date);
 
     time += seconds_between_years(year, (Year)(safe_date.tm_year + 1900));
+    TIME64_TRACE1("mktime64 => %"PRId64" seconds\n", time);
 
     return time;
 }

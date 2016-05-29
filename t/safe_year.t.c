@@ -43,13 +43,14 @@ static void test_safe_year(Year orig_year) {
     struct TM orig_tm;
 
     if( orig_year > 1970 && orig_year < 2038 ) {
-        is_Int64( orig_year, (Year)year, "safe_year() returns same year if already safe" );
+        is_Int64( orig_year, (Year)year, "safe_year(%d) returns same year if already safe",
+                  orig_year);
     }
     else if( orig_year <= 1970 ) {
-        ok( year < 2000, "safe_year() < 2000 for year <= 1970" );
+        ok( year < 2000, "safe_year(%d) < 2000 for year <= 1970", year );
     }
     else if( orig_year >= 2038 ) {
-        ok( year > 2000, "safe_year() > 2000 for year >= 2038" );
+        ok( year > 2000, "safe_year(%d) > 2000 for year >= 2038", year );
     }
     else {
         assert(0);
@@ -57,25 +58,29 @@ static void test_safe_year(Year orig_year) {
 
     year_to_tm((Year)year, &safe_tm);
     year_to_TM(orig_year, &orig_tm);
-    is_Int64( (Year)orig_tm.tm_year, (Year)(orig_year - 1900), "year_to_tm(orig)" );
-    is_int( safe_tm.tm_year, year - 1900, "year_to_TM(safe)" );
+    is_Int64( (Year)orig_tm.tm_year, (Year)(orig_year - 1900), "year_to_tm(orig %d)",
+              (int)orig_year );
+    is_int( safe_tm.tm_year, year - 1900, "year_to_TM(safe %d)", year );
 
     ok(1, "orig_year: %"PRId64", safe_year: %d", orig_year, year);
     is_int( safe_tm.tm_wday, orig_tm.tm_wday,                      "  tm_wday" );
-    is_int( IS_LEAP( year - 1900 ), IS_LEAP( orig_year - 1900 ),   "  ISLEAP()" );
+    is_int( IS_LEAP( year - 1900), IS_LEAP( orig_year - 1900),   "  ISLEAP(%d)", year );
+    if (orig_year > 0)
+        is_int( IS_LEAP_ABS(year), IS_LEAP_ABS(orig_year),   "  ISLEAP_ABS(%d)", year );
 
     year--;
     orig_year--;
     year_to_tm((Year)year, &safe_tm);
     year_to_TM(orig_year, &orig_tm);
-    is_int( safe_tm.tm_wday, orig_tm.tm_wday,                      "  previous tm_wday" );
-    is_int( IS_LEAP( year - 1900 ), IS_LEAP( orig_year - 1900 ),   "  previous ISLEAP()" );
+    is_int( safe_tm.tm_wday, orig_tm.tm_wday,            "  previous tm_wday" );
+    if (orig_year > 0)
+        is_int( IS_LEAP_ABS(year), IS_LEAP_ABS(orig_year),"  previous ISLEAP(%d)", orig_year );
 
     year += 2;
     orig_year += 2;
     year_to_tm((Year)year, &safe_tm);
     year_to_TM(orig_year, &orig_tm);
-    is_int( safe_tm.tm_wday, orig_tm.tm_wday,                           "  next tm_wday" );
+    is_int( safe_tm.tm_wday, orig_tm.tm_wday,            "  next tm_wday" );
     /* Don't care about the next leap status */
 }
 
