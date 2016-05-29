@@ -12,6 +12,7 @@ nytprof*
 .DS_Store
 MYMETA.yml
 *.o
+*.i
 t/bench
 t/bench_system
 t/*.out.bz2

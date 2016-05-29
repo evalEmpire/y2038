@@ -24,7 +24,10 @@ all : $(CHECK_MAX_BIN)
 
 $(CHECK_MAX_BIN) : $(TIME64_OBJECTS)
 
-time64.o : time64_config.h time64_limits.h time64.h Makefile
+time64.o time64.i: time64_config.h time64_limits.h time64.h Makefile
+
+%.i: %.c
+	$(CC) -c $(CFLAGS) -o $@ -E -c $<
 
 bench : t/bench t/bench_system
 	time t/bench_system
