@@ -43,7 +43,7 @@ int main(void) {
     date.tm_hour = 5;
     asctime_r_ret2 = asctime64_r( &date, asctime_r_buf2 );
     is_str( asctime_r_buf2,  "Mon May  4 05:02:42 234567\n", "asctime64_r() again" );
-    is_str( asctime_r_ret1,  "Mon May  4 03:02:42 234567\n", "  return not static" );
+    is_str( asctime_r_ret2,  "Mon May  4 05:02:42 234567\n", "  return not static" );
 
     /* Upon successful completion, asctime() shall return a pointer to the string.
        If the function is unsuccessful, it shall return NULL. (ISO)

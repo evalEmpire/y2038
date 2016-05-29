@@ -7,7 +7,7 @@ int mktime64_ok(Time64_T time) {
     struct TM date;
 
     localtime64_r(&time, &date);
-    return is_Int64( mktime64(&date), time, "mktime64(%lld)", time );
+    return is_Int64( mktime64(&date), time, "mktime64(%"PRId64")", time );
 }
 
 int main(void) {
@@ -33,7 +33,6 @@ int main(void) {
     localtime64_r(&time, &date);
     is_Int64( mktime64(&date), timelocal64(&date), "timelocal64 alias" );
 
-
     /* Test that mktime64 accepts and corrects out of bound dates */
     /* The original values of the tm_wday and tm_yday components of the
      * structure are ignored, and the original values of the other components
@@ -50,6 +49,12 @@ int main(void) {
     date.tm_mday = 37;
     date.tm_wday = 9;           /* deliberately wrong week day */
     date.tm_yday = 487;         /* and wrong year day */
+#ifdef HAS_TM_TM_GMTOFF
+    /*date.tm_gmtoff = 0;*/
+#endif
+#ifdef HAS_TM_TM_ZONE
+    /*date.tm_zone = "UTC";*/
+#endif
 
     /* Upon successful completion, the values of the tm_wday and tm_yday
      * components of the structure shall be set appropriately, and the other
@@ -59,7 +64,7 @@ int main(void) {
      * tm_year are determined.
      * http://www.opengroup.org/onlinepubs/009695399/functions/mktime.html
      */
-    is_Int64( mktime64(&date), time, "mktime64(%lld)", time );
+    is_Int64( mktime64(&date), time, "mktime64(%"PRId64")", time );
     is_int( date.tm_mon,  2, "tm_mon corrected" );
     is_int( date.tm_mday, 9, "tm_mday corrected" );
     is_int( date.tm_yday, 67,"tm_yday corrected" );

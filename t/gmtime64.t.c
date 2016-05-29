@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <inttypes.h>
 #include "time64.h"
 #include "t/tap.h"
 
@@ -29,12 +30,12 @@ int main(void) {
     for( time = -6000000000LL;  time < 6000000000LL; time += 712359 ) {
         localtime64_r(&time, &want_date);
         have_date = localtime64(&time);
-        sprintf(name, "localtime64(%lld)", time);
+        sprintf(name, "localtime64(%"PRId64")", time);
         tm_is( have_date, &want_date, name );
 
         gmtime64_r(&time, &want_date);
         have_date = gmtime64(&time);
-        sprintf(name, "gmtime64(%lld)", time);
+        sprintf(name, "gmtime64(%"PRId64")", time);
         tm_is( have_date, &want_date, name );
     }
 

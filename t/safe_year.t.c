@@ -8,7 +8,7 @@
 static void year_to_TM(const Year year, struct TM *date) {
     Time64_T time;
 
-    date->tm_year = year - 1900;
+    date->tm_year = (year_t)(year - 1900);
     date->tm_mon  = 0;
     date->tm_mday = 1;
     date->tm_hour = 0;
@@ -24,7 +24,7 @@ static void year_to_tm(const Year year, struct tm *ret) {
     Time64_T time;
     struct TM date;
 
-    date.tm_year = year - 1900;
+    date.tm_year = (year_t)(year - 1900);
     date.tm_mon  = 0;
     date.tm_mday = 1;
     date.tm_hour = 0;
@@ -60,7 +60,7 @@ static void test_safe_year(Year orig_year) {
     is_Int64( (Year)orig_tm.tm_year, (Year)(orig_year - 1900), "year_to_tm(orig)" );
     is_int( safe_tm.tm_year, year - 1900, "year_to_TM(safe)" );
 
-    ok(1, "orig_year: %lld, safe_year: %d", orig_year, year);
+    ok(1, "orig_year: %"PRId64", safe_year: %d", orig_year, year);
     is_int( safe_tm.tm_wday, orig_tm.tm_wday,                      "  tm_wday" );
     is_int( IS_LEAP( year - 1900 ), IS_LEAP( orig_year - 1900 ),   "  ISLEAP()" );
 

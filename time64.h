@@ -13,6 +13,13 @@ typedef INT_64_T        Int64;
 typedef Int64           Time64_T;
 typedef Int64           Year;
 
+#ifndef PRId64
+# if (__WORDSIZE == 64) && !defined(__APPLE__)
+#  define PRId64 "ld"
+# else
+#  define PRId64 "lld"
+# endif
+#endif
 
 /* A copy of the tm struct but with a 64 bit year */
 struct TM64 {
@@ -76,7 +83,7 @@ Time64_T   timelocal64   (struct TM *);
 
 /* Use a different asctime format depending on how big the year is */
 #ifdef USE_TM64
-    #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %lld\n"
+    #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %"PRId64"\n"
 #else
     #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n"
 #endif

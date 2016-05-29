@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
+#include <inttypes.h>
 #include "time64.h"
 
 #include "tap.h"
@@ -105,8 +106,8 @@ int is_Int64(const Int64 have, const Int64 want, const char *name, ...) {
     do_test( test, name, args );
 
     if( !test ) {
-        diag("have: %lld", have);
-        diag("want: %lld", want);
+        diag("have: %"PRId64, have);
+        diag("want: %"PRId64, want);
     }
 
     va_end(args);
@@ -153,11 +154,10 @@ int tm_is(const struct TM *have, const struct TM *want, const char *name)
     return pass;
 }
 
-
 struct TM make_tm( int sec, int min, int hour, int day, int mon, Year year ) {
     struct TM date;
 
-    date.tm_year = year - 1900;
+    date.tm_year = (year_t)(year - 1900);
     date.tm_mon  = mon - 1;
     date.tm_mday  = day;
     date.tm_hour = hour;

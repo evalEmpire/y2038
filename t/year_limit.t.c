@@ -1,5 +1,6 @@
-#include "time64.h"
 #include <stdio.h>
+#include <inttypes.h>
+#include "time64.h"
 #include "t/tap.h"
 
 int main(void)
@@ -17,12 +18,12 @@ int main(void)
     int  expected_mday  = 19;
 #endif
 
-    printf("# time: %lld\n", time);
+    printf("# time: %"PRId64"\n", time);
     gmtime64_r(&time, &gtime);
     printf("# sizeof time_t: %ld\n", sizeof(time_t));
     printf("# sizeof long long: %ld\n", sizeof(Time64_T));
     printf("# sizeof tm.tm_year: %ld\n", sizeof(gtime.tm_year));
-    printf("# %04lld.%02d.%02d %02d:%02d:%02d\n",
+    printf("# %04"PRId64".%02d.%02d %02d:%02d:%02d\n",
         (Year)(gtime.tm_year + 1900),
         gtime.tm_mon  + 1,
         gtime.tm_mday,

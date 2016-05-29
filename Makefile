@@ -19,7 +19,8 @@ ifeq ($(UNAME_S),Linux)
   # Under Linux/glibc you will need flag _BSD_SOURCE for names tm_gmtoff and tm_zone
   # (instead of __tm_gmtoff and __tm_zone) in struct tm,
   # and _POSIX_SOURCE (there are alternatives) for tzset().
-  CFLAGS += -D_BSD_SOURCE -D_POSIX_SOURCE
+  # _BSD_SOURCE is deprecated, use _DEFAULT_SOURCE instead
+  CFLAGS += -D_DEFAULT_SOURCE -D_POSIX_SOURCE -DHAS_TM_TM_GMTOFF -DHAS_TM_TM_ZONE
 endif
 ifneq ($(DEBUG),)
   CFLAGS  += -DTIME_64_DEBUG
