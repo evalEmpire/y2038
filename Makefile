@@ -7,8 +7,6 @@ OPTIMIZE = -O3 -g
 WARNINGS = -W -Wall -Wextra -ansi -pedantic -Wno-long-long -Wdeclaration-after-statement \
   -Wendif-labels -Wconversion -Wcast-qual -Wwrite-strings -Wmissing-prototypes \
   -Wc++-compat
-#clang: -Wno-incompatible-pointer-types-discards-qualifiers
-#gcc:   -Wno-discarded-qualifiers
 INCLUDE  = -I.
 CFLAGS   = $(WARNINGS) $(OPTIMIZE) $(INCLUDE)
 UNAME_S := $(shell uname -s)
@@ -21,7 +19,6 @@ ifeq ($(UNAME_S),Linux)
   # and _POSIX_SOURCE (there are alternatives) for tzset().
   # _BSD_SOURCE is deprecated, use _DEFAULT_SOURCE instead
   CFLAGS += -D_BSD_SOURCE -D_DEFAULT_SOURCE -D_POSIX_SOURCE
-  #CFLAGS += -D_DEFAULT_SOURCE -D_POSIX_SOURCE -DHAS_TM_TM_GMTOFF -DHAS_TM_TM_ZONE
 endif
 ifneq ($(DEBUG),)
   CFLAGS  += -DTIME_64_DEBUG
