@@ -3,10 +3,12 @@
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
+#include <inttypes.h>
 #include "time64.h"
 
-int Test_Count = 0;
+#include "tap.h"
 
+int Test_Count = 0;
 
 int diag(const char *message, ...) {
     va_list args;
@@ -29,6 +31,7 @@ void skip_all(const char *reason) {
 
 
 int do_test(const int test, const char *message, va_list args) {
+
     Test_Count++;
 
     printf("%s %d ", (test ? "ok" : "not ok"), Test_Count);
@@ -37,7 +40,6 @@ int do_test(const int test, const char *message, va_list args) {
 
     if( !test ) {
         diag("Failed test");
-        diag(message, args);
     }
 
     return test;
@@ -84,8 +86,7 @@ int is_str(const char* have, const char* want, const char *message, ...) {
     do_test( test, message, args );
 
     if( !test ) {
-        diag("have: %s", have);
-        diag("want: %s", want);
+      diag("have: %s, want: %s", have, want);
     }
 
     va_end(args);
@@ -103,8 +104,7 @@ int is_Int64(const Int64 have, const Int64 want, const char *name, ...) {
     do_test( test, name, args );
 
     if( !test ) {
-        diag("have: %lld", have);
-        diag("want: %lld", want);
+        diag("have: %"PRId64" want: %"PRId64" diff: %"PRId64, have, want, have-want);
     }
 
     va_end(args);
@@ -151,11 +151,10 @@ int tm_is(const struct TM *have, const struct TM *want, const char *name)
     return pass;
 }
 
-
 struct TM make_tm( int sec, int min, int hour, int day, int mon, Year year ) {
     struct TM date;
 
-    date.tm_year = year - 1900;
+    date.tm_year = (year_t)(year - 1900);
     date.tm_mon  = mon - 1;
     date.tm_mday  = day;
     date.tm_hour = hour;

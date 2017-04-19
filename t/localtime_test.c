@@ -11,7 +11,7 @@ int main(void)
 
     while(d.tm_year < 800) {
         localtime64_r(&time, &d);
-        printf("%lld %d %d %d %d %d %lld %d %d %d\n",
+        printf("%"PRId64" %d %d %d %d %d %"PRId64" %d %d %d\n",
                 time,
                 d.tm_sec,
                 d.tm_min,

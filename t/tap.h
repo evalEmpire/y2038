@@ -1,7 +1,15 @@
+#include <stdarg.h>
 #include "time64.h"
 
-int diag(const char, ...);
+#ifdef USE_TM64
+#define year_t Year
+#else
+#define year_t int
+#endif
+
+int diag(const char*, ...);
 void skip_all(const char *);
+int do_test(const int, const char *, va_list);
 
 int ok(const int, const char *, ...);
 int is_int(const int, const int, const char *, ...);
