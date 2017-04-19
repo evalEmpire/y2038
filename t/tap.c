@@ -86,7 +86,8 @@ int is_str(const char* have, const char* want, const char *message, ...) {
     do_test( test, message, args );
 
     if( !test ) {
-      diag("have: %s, want: %s", have, want);
+      diag("have: %s", have);
+      diag("want: %s", want);
     }
 
     va_end(args);
@@ -104,7 +105,9 @@ int is_Int64(const Int64 have, const Int64 want, const char *name, ...) {
     do_test( test, name, args );
 
     if( !test ) {
-        diag("have: %"PRId64" want: %"PRId64" diff: %"PRId64, have, want, have-want);
+        diag("have: %"PRId64, have);
+        diag("want: %"PRId64, want);
+        diag("diff: %"PRId64, have-want);
     }
 
     va_end(args);
