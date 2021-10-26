@@ -521,7 +521,7 @@ static Time64_T seconds_between_years(Year left_year, Year right_year) {
     else if( left_year < 1600 ) {
         TIME64_TRACE1("year %"PRId64" < 1600\n", left_year);
         cycles = (left_year - 1600) / 400;
-        left_year += cycles * 400;
+        left_year -= cycles * 400;
         seconds   += cycles * seconds_in_gregorian_cycle;
     }
 
