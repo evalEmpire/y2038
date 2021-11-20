@@ -506,8 +506,9 @@ struct tm * fake_gmtime_r(const time_t *time, struct tm *result) {
 
 #endif  /* #ifndef HAS_GMTIME_R */
 
-
-static Time64_T seconds_between_years(Year left_year, Year right_year) {
+/* left_year and right_year must have the same number of days (both 365 or both 366)*/
+/* right_year must be inside the safe date range*/
+static Time64_T seconds_between_years_with_same_daycount(Year left_year, Year right_year) {
     int increment = (left_year > right_year) ? 1 : -1;
     Time64_T seconds = 0;
     Year cycles;
@@ -521,7 +522,7 @@ static Time64_T seconds_between_years(Year left_year, Year right_year) {
     else if( left_year < 1600 ) {
         TIME64_TRACE1("year %"PRId64" < 1600\n", left_year);
         cycles = (left_year - 1600) / 400;
-        left_year += cycles * 400;
+        left_year -= cycles * 400;
         seconds   += cycles * seconds_in_gregorian_cycle;
     }
 
@@ -573,7 +574,7 @@ Time64_T mktime64(struct TM *input_date) {
     /* Correct the user's possibly out of bound input date */
     copy_tm_to_TM64(&safe_date, input_date);
 
-    time += seconds_between_years(year, (Year)(safe_date.tm_year + 1900));
+    time += seconds_between_years_with_same_daycount(year, (Year)(safe_date.tm_year + 1900));
     TIME64_TRACE1("mktime64 => %"PRId64" seconds\n", time);
 
     return time;
